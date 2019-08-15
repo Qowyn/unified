@@ -136,25 +136,29 @@ void Chat::SendServerToPlayerChatMessage(CNWSMessage* thisPtr, Constants::ChatCh
                     {
                         speakerArea = pSpeaker->GetArea();
                         speakerPos = pSpeaker->m_vPosition;
-                        pSpeaker->BroadcastDialog(*tellName, distance);
+                        pSpeaker->BroadcastDialog(message, distance);
                     }
 
                     for (auto *head = playerList->pHead; head; head = head->pNext)
                     {
-                        auto *pClient = static_cast<API::CNWSClient*>(head->pObject);
-                        auto *listenerClient =  server->GetClientObjectByPlayerId(pClient->m_nPlayerID, 0);
-                        auto *listener = static_cast<API::CNWSPlayer*>(listenerClient);
+                        auto *listener = static_cast<API::CNWSPlayer*>(head->pObject);
                         auto *listenerObj = Utils::AsNWSObject(listener->GetGameObject());
 
-                        auto pDistance = *pPOS->Get<float>(listenerObj->m_idSelf, "HEARING_DISTANCE:" + std::to_string(channel));
-                        if (pDistance >= 0)
+                        if (listenerObj && speakerArea == listenerObj->GetArea())
                         {
-                            distance = pDistance;
+                            auto pDistance = *pPOS->Get<float>(listener->m_oidPCObject, "HEARING_DISTANCE:" + std::to_string(channel));
+
+                            if (pDistance == 0)
+                            {
+                                pDistance = distance;
+                            }
+
+                            if (pDistance <= 0) continue;
 
                             auto v = listenerObj->m_vPosition;
                             v -= speakerPos;
                             float vSquared = v.x*v.x + v.y*v.y + v.z*v.z;
-                            if (speakerArea == listenerObj->GetArea() && vSquared <= distance*distance)
+                            if (vSquared <= pDistance*pDistance)
                             {
                                 switch (channel)
                                 {
@@ -349,7 +353,7 @@ Events::ArgumentStack Chat::OnGetChatHearingDistance(Events::ArgumentStack&& arg
     {
         auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
         auto playerHearingDistance = *pPOS->Get<float>(playerOid, "HEARING_DISTANCE:" + std::to_string(channel));
-        retVal = playerHearingDistance > 0 ? playerHearingDistance : m_hearingDistances[channel];
+        retVal = playerHearingDistance != 0 ? playerHearingDistance : m_hearingDistances[channel];
     }
     Events::InsertArgument(stack, retVal);
     return stack;
