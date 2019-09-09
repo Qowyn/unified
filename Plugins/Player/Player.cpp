@@ -911,7 +911,7 @@ ArgumentStack Player::ApplyLoopingVisualEffectToObject(ArgumentStack&& args)
                     if (auto *pObject = Utils::AsNWSObject(Utils::GetGameObject(oidObjectToUpdate)))
                     {
                         static bool bKeyExists;
-                        const std::string key = Utils::ObjectIDToString(pPlayer->m_oidNWSObject) + "_" +
+                        const std::string key = Utils::ObjectIDToString(pPlayer->m_oidPCObject) + "_" +
                                                 Utils::ObjectIDToString(pObject->m_idSelf);
 
                         if (type == Services::Hooks::CallType::BEFORE_ORIGINAL)
@@ -951,7 +951,7 @@ ArgumentStack Player::ApplyLoopingVisualEffectToObject(ArgumentStack&& args)
         auto visualEffect = Services::Events::ExtractArgument<int32_t>(args);
           ASSERT_OR_THROW(visualEffect <= 65535);
 
-        const std::string key = Utils::ObjectIDToString(pPlayer->m_oidNWSObject) + "_" + Utils::ObjectIDToString(oidTarget);
+        const std::string key = Utils::ObjectIDToString(pPlayer->m_oidPCObject) + "_" + Utils::ObjectIDToString(oidTarget);
 
         if (visualEffect < 0)
         {
