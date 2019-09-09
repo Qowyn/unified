@@ -131,41 +131,61 @@ void Chat::SendServerToPlayerChatMessage(CNWSMessage* thisPtr, Constants::ChatCh
                     auto pSpeaker = Utils::AsNWSObject(server->GetGameObject(sender));
                     auto distance = g_plugin->m_hearingDistances[channel];
                     auto speakerPos = Vector{0.0f, 0.0f, 0.0f};
+                    auto isCreature = false;
                     CNWSArea *speakerArea = nullptr;
                     if (pSpeaker != nullptr)
                     {
                         speakerArea = pSpeaker->GetArea();
                         speakerPos = pSpeaker->m_vPosition;
-                        pSpeaker->BroadcastDialog(*tellName, distance);
+                        pSpeaker->BroadcastDialog(message, distance);
+                        isCreature = pSpeaker->AsNWSCreature() != nullptr;
                     }
 
                     for (auto *head = playerList->pHead; head; head = head->pNext)
                     {
-                        auto *pClient = static_cast<API::CNWSClient*>(head->pObject);
-                        auto *listenerClient =  server->GetClientObjectByPlayerId(pClient->m_nPlayerID, 0);
-                        auto *listener = static_cast<API::CNWSPlayer*>(listenerClient);
+                        auto *listener = static_cast<API::CNWSPlayer*>(head->pObject);
                         auto *listenerObj = Utils::AsNWSObject(listener->GetGameObject());
 
-                        auto pDistance = *pPOS->Get<float>(listenerObj->m_idSelf, "HEARING_DISTANCE:" + std::to_string(channel));
-                        if (pDistance >= 0)
+                        if (listenerObj && speakerArea == listenerObj->GetArea())
                         {
-                            distance = pDistance;
+                            auto pDistance = *pPOS->Get<float>(listener->m_oidPCObject, "HEARING_DISTANCE:" + std::to_string(channel));
+
+                            if (pDistance == 0)
+                            {
+                                pDistance = distance;
+                            }
+
+                            if (pDistance <= 0) continue;
 
                             auto v = listenerObj->m_vPosition;
                             v -= speakerPos;
                             float vSquared = v.x*v.x + v.y*v.y + v.z*v.z;
-                            if (speakerArea == listenerObj->GetArea() && vSquared <= distance*distance)
+                            if (vSquared <= pDistance*pDistance)
                             {
                                 switch (channel)
                                 {
                                     case Constants::ChatChannel::PlayerTalk:
-                                        thisPtr->SendServerToPlayerChat_Talk(listener->m_nPlayerID, sender, message);
+                                        if (isCreature)
+                                        {
+                                            thisPtr->SendServerToPlayerChat_DM_Talk(listener->m_nPlayerID, sender, message);
+                                        }
+                                        else
+                                        {
+                                            thisPtr->SendServerToPlayerChat_Talk(listener->m_nPlayerID, sender, message);
+                                        }
                                         break;
                                     case Constants::ChatChannel::DmTalk:
                                         thisPtr->SendServerToPlayerChat_DM_Talk(listener->m_nPlayerID, sender, message);
                                         break;
                                     case Constants::ChatChannel::PlayerWhisper:
-                                        thisPtr->SendServerToPlayerChat_Whisper(listener->m_nPlayerID, sender, message);
+                                        if (isCreature)
+                                        {
+                                            thisPtr->SendServerToPlayerChat_DM_Whisper(listener->m_nPlayerID, sender, message);
+                                        }
+                                        else
+                                        {
+                                            thisPtr->SendServerToPlayerChat_Whisper(listener->m_nPlayerID, sender, message);
+                                        }
                                         break;
                                     case Constants::ChatChannel::DmWhisper:
                                         thisPtr->SendServerToPlayerChat_DM_Whisper(listener->m_nPlayerID, sender, message);
@@ -243,6 +263,11 @@ Events::ArgumentStack Chat::OnSendMessage(Events::ArgumentStack&& args)
             else if (channel == Constants::ChatChannel::DmWhisper)
             {
                 messageDispatch->SendServerToPlayerChat_DM_Whisper(playerId, speaker, message.c_str());
+                sentMessage = true;
+            }
+            else if (channel == Constants::ChatChannel::PlayerParty)
+            {
+                messageDispatch->SendServerToPlayerChat_Party(playerId, speaker, message.c_str());
                 sentMessage = true;
             }
         }
@@ -349,7 +374,7 @@ Events::ArgumentStack Chat::OnGetChatHearingDistance(Events::ArgumentStack&& arg
     {
         auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
         auto playerHearingDistance = *pPOS->Get<float>(playerOid, "HEARING_DISTANCE:" + std::to_string(channel));
-        retVal = playerHearingDistance > 0 ? playerHearingDistance : m_hearingDistances[channel];
+        retVal = playerHearingDistance != 0 ? playerHearingDistance : m_hearingDistances[channel];
     }
     Events::InsertArgument(stack, retVal);
     return stack;
