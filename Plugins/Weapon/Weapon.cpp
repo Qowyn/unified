@@ -750,13 +750,33 @@ int32_t Weapon::GetAttackModifierVersus(NWNXLib::API::CNWSCreatureStats* pStats,
 
     int nMod = plugin.m_GetAttackModifierVersusHook->CallOriginal<int32_t>(pStats, pCreature);
 
+    if (pStats->m_pBaseCreature->m_nCombatMode == Constants::CombatMode::FlurryOfBlows)
+    {
+        int nMonk = plugin.GetLevelByClass(pStats, Constants::ClassType::Monk);
+        if (nMonk > 8)
+        {
+            nMod += 2;
+        }
+        else if (nMonk > 4)
+        {
+            nMod += 1;
+        }
+    }
+
     pCombatRound = pStats->m_pBaseCreature->m_pcCombatRound;
     if (pCombatRound == nullptr)
     {
         return nMod;
     }
 
-    pWeapon = pCombatRound->GetCurrentAttackWeapon(pCombatRound->GetWeaponAttackType());
+    auto nAttackType = pCombatRound->GetWeaponAttackType();
+
+    if (nAttackType == 8 || nAttackType == 6)
+    {
+        nMod += 5 * (pCombatRound->m_nExtraAttacksTaken - 1);
+    }
+
+    pWeapon = pCombatRound->GetCurrentAttackWeapon(nAttackType);
     if (pWeapon == nullptr)
     {
         return nMod;
@@ -790,6 +810,19 @@ int32_t Weapon::GetMeleeAttackBonus(NWNXLib::API::CNWSCreatureStats* pStats, boo
     if (bTouchAttack)
     {
         return nBonus;
+    }
+
+    if (pStats->m_pBaseCreature->m_nCombatMode == Constants::CombatMode::FlurryOfBlows)
+    {
+        int nMonk = plugin.GetLevelByClass(pStats, Constants::ClassType::Monk);
+        if (nMonk > 8)
+        {
+            nBonus += 2;
+        }
+        else if (nMonk > 4)
+        {
+            nBonus += 1;
+        }
     }
 
     if (bOffHand)
@@ -836,6 +869,19 @@ int32_t Weapon::GetRangedAttackBonus(NWNXLib::API::CNWSCreatureStats* pStats, bo
         return nBonus;
     }
 
+    if (pStats->m_pBaseCreature->m_nCombatMode == Constants::CombatMode::FlurryOfBlows)
+    {
+        int nMonk = plugin.GetLevelByClass(pStats, Constants::ClassType::Monk);
+        if (nMonk > 8)
+        {
+            nBonus += 2;
+        }
+        else if (nMonk > 4)
+        {
+            nBonus += 1;
+        }
+    }
+
     pWeapon=pStats->m_pBaseCreature->m_pInventory->GetItemInSlot(Constants::EquipmentSlot::RightHand);
 
     if (pWeapon == nullptr)
@@ -868,8 +914,10 @@ int32_t Weapon::ToggleMode(CNWSCreature *pCreature, unsigned char nMode)
     return plugin.m_ToggleModeHook->CallOriginal<int32_t>(pCreature, nMode);
 }
 
-int32_t Weapon::GetUseMonkAttackTables(NWNXLib::API::CNWSCreatureStats* pStats, bool bForceUnarmed)
+int32_t Weapon::GetUseMonkAttackTables(NWNXLib::API::CNWSCreatureStats* pStats, int32_t bForceUnarmed)
 {
+    if (bForceUnarmed < 1) return 0;
+
     Weapon& plugin = *g_plugin;
     NWNXLib::API::CNWSItem* pWeapon;
     int nMonk = plugin.GetLevelByClass(pStats, Constants::ClassType::Monk);
@@ -886,7 +934,7 @@ int32_t Weapon::GetUseMonkAttackTables(NWNXLib::API::CNWSCreatureStats* pStats, 
         return 1;
     }
 
-    if (bForceUnarmed)
+    if (bForceUnarmed == 1)
     {
         return 0;
     }

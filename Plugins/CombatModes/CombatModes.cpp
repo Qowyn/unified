@@ -66,13 +66,14 @@ CombatModes::~CombatModes()
 
 void CombatModes::SetCombatModeHook(API::CNWSCreature* thisPtr, uint8_t nNewMode, int32_t bForceNewMode)
 {
+    bool bUpdate = false;
     //If Weapon plugin recquires flurry of blows
     if(g_plugin->m_FlurryOfBlows)
     {
         //flurry of blows automatic cancel
         if(nNewMode == CombatMode::None && bForceNewMode && thisPtr->m_nCombatMode == CombatMode::FlurryOfBlows)
         {
-            if(thisPtr->m_pStats->GetUseMonkAttackTables(0))
+            if(thisPtr->m_pStats->GetUseMonkAttackTables(2))
             {
                 return;
             }
@@ -83,6 +84,7 @@ void CombatModes::SetCombatModeHook(API::CNWSCreature* thisPtr, uint8_t nNewMode
         {
             nNewMode = CombatMode::None;
             bForceNewMode = 1;
+            bUpdate = true;
         }
     }
 
@@ -113,14 +115,19 @@ void CombatModes::SetCombatModeHook(API::CNWSCreature* thisPtr, uint8_t nNewMode
         //flurry of blows manual activation
         if(g_plugin->m_FlurryOfBlows && nNewMode == CombatMode::FlurryOfBlows && bForceNewMode)
         {
-            if(thisPtr->m_pStats->GetUseMonkAttackTables(0))
+            if(thisPtr->m_pStats->GetUseMonkAttackTables(2))
             {
                 thisPtr->m_nCombatMode = CombatMode::FlurryOfBlows;
                 thisPtr->SetActivity(0x4000,1);
+                thisPtr->m_pStats->UpdateCombatInformation();
                 return;
             }
         }
-        return g_SetCombatModeHook->CallOriginal<void>(thisPtr, nNewMode, bForceNewMode);
+        g_SetCombatModeHook->CallOriginal<void>(thisPtr, nNewMode, bForceNewMode);
+        if (bUpdate)
+        {
+            thisPtr->m_pStats->UpdateCombatInformation();
+        }
     }
 }
 

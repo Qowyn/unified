@@ -85,7 +85,7 @@ private:
     static int32_t GetMeleeAttackBonus              (NWNXLib::API::CNWSCreatureStats *pStats, bool bOffHand, bool bIncludeBase, bool bTouchAttack);
     static int32_t GetRangedAttackBonus             (NWNXLib::API::CNWSCreatureStats *pStats, bool bIncludeBase, bool bTouchAttack);
     static int32_t GetAttackModifierVersus          (NWNXLib::API::CNWSCreatureStats *pStats, NWNXLib::API::CNWSCreature* pCreature);
-    static int32_t GetUseMonkAttackTables           (NWNXLib::API::CNWSCreatureStats *pStats, bool bForceUnarmed);
+    static int32_t GetUseMonkAttackTables           (NWNXLib::API::CNWSCreatureStats *pStats, int32_t bForceUnarmed);
     static int32_t ToggleMode                       (NWNXLib::API::CNWSCreature *pCreature, unsigned char nMode);
 
     std::map<std::uint32_t, std::uint32_t> m_WeaponFocusMap;
