@@ -17,6 +17,7 @@ struct NWNX_Weapon_DevastatingCriticalEvent_Data // Devastating critical event d
     object oWeapon;
     object oTarget;
     int nDamage;
+    int bFav;
 };
 
 // Set nFeat as weapon focus feat for nBaseItem
@@ -239,6 +240,7 @@ struct NWNX_Weapon_DevastatingCriticalEvent_Data NWNX_Weapon_GetDevastatingCriti
     data.oWeapon = NWNX_GetReturnValueObject(NWNX_Weapon, sFunc);
     data.oTarget = NWNX_GetReturnValueObject(NWNX_Weapon, sFunc);
     data.nDamage = NWNX_GetReturnValueInt(NWNX_Weapon, sFunc);
+    data.bFav = NWNX_GetReturnValueInt(NWNX_Weapon, sFunc);
 
     return data;
 }

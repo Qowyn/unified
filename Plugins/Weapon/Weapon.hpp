@@ -22,6 +22,7 @@ struct DevastatingCriticalDataStr
     uint32_t oidWeapon;
     uint32_t oidTarget;
     int32_t  nDamage;
+    bool     bFav;
     bool     bBypass;
 };
 

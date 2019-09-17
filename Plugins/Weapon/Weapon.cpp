@@ -414,6 +414,7 @@ ArgumentStack Weapon::GetEventData(ArgumentStack&& args)
     switch(nOption)
     {
         case NWNX_WEAPON_GETDATA_DC:
+            Services::Events::InsertArgument(stack, m_DCData.bFav ? 1 : 0);
             Services::Events::InsertArgument(stack, m_DCData.nDamage);
             Services::Events::InsertArgument(stack, m_DCData.oidTarget);
             Services::Events::InsertArgument(stack, m_DCData.oidWeapon);
@@ -580,18 +581,33 @@ int32_t Weapon::GetEpicWeaponDevastatingCritical(NWNXLib::API::CNWSCreatureStats
     int32_t feat = -1;
     Weapon& plugin = *g_plugin;
     bool bFlag = false;
+    bool bFav = false;
 
-    if (pWeapon == nullptr)
+    if (pStats->HasFeat(1118))
     {
-        auto w = plugin.m_EpicWeaponDevastatingCriticalMap.find(Constants::BaseItem::Gloves);
-        feat = (w == plugin.m_EpicWeaponDevastatingCriticalMap.end()) ? -1 : w->second;
+        auto oidTarget = pStats->m_pBaseCreature->m_oidAttackTarget;
+        auto *pTargetCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(oidTarget);
+        if (pTargetCreature && pStats->GetFavoredEnemyBonus(pTargetCreature) > 0)
+        {
+            bFlag = true;
+            bFav = true;
+        }
     }
-    else
+
+    if (!bFlag)
     {
-        auto w = plugin.m_EpicWeaponDevastatingCriticalMap.find(pWeapon->m_nBaseItem);
-        feat = (w == plugin.m_EpicWeaponDevastatingCriticalMap.end()) ? -1 : w->second;
+        if (pWeapon == nullptr)
+        {
+            auto w = plugin.m_EpicWeaponDevastatingCriticalMap.find(Constants::BaseItem::Gloves);
+            feat = (w == plugin.m_EpicWeaponDevastatingCriticalMap.end()) ? -1 : w->second;
+        }
+        else
+        {
+            auto w = plugin.m_EpicWeaponDevastatingCriticalMap.find(pWeapon->m_nBaseItem);
+            feat = (w == plugin.m_EpicWeaponDevastatingCriticalMap.end()) ? -1 : w->second;
+        }
+        bFlag = feat > -1 ? pStats->HasFeat(feat) : plugin.m_GetEpicWeaponDevastatingCriticalHook->CallOriginal<int32_t>(pStats, pWeapon);
     }
-    bFlag = feat > -1 ? pStats->HasFeat(feat) : plugin.m_GetEpicWeaponDevastatingCriticalHook->CallOriginal<int32_t>(pStats, pWeapon);
 
     if (bFlag && !plugin.m_DCScript.empty())
     {
@@ -602,6 +618,7 @@ int32_t Weapon::GetEpicWeaponDevastatingCritical(NWNXLib::API::CNWSCreatureStats
         plugin.m_DCData.oidWeapon = pWeapon->m_idSelf;
         plugin.m_DCData.oidTarget = pCreature->m_oidAttackTarget;
         plugin.m_DCData.nDamage   = pAttackData->GetTotalDamage(1);
+        plugin.m_DCData.bFav      = bFav;
         plugin.m_DCData.bBypass   = false;
 
         Utils::ExecuteScript(plugin.m_DCScript, pCreature->m_idSelf);
@@ -767,7 +784,7 @@ int32_t Weapon::GetAttackModifierVersus(NWNXLib::API::CNWSCreatureStats* pStats,
     if (pCombatRound == nullptr)
     {
         return nMod;
-    }
+    }//AttackType == 65002
 
     auto nAttackType = pCombatRound->GetWeaponAttackType();
 

@@ -43,6 +43,7 @@ NWNX_PLUGIN_ENTRY Plugin* PluginLoad(Plugin::CreateParams params)
 namespace Custom {
 
 static NWNXLib::Hooking::FunctionHook* m_InitializeNumberOfAttacksHook;
+static NWNXLib::Hooking::FunctionHook* m_GetFavoredEnemyBonusHook;
 
 Custom::Custom(const Plugin::CreateParams& params)
     : Plugin(params)
@@ -53,8 +54,10 @@ Custom::Custom(const Plugin::CreateParams& params)
     REGISTER(PossessCreature);
     REGISTER(UnpossessCreature);
 #undef REGISTER
-    GetServices()->m_hooks->RequestExclusiveHook<API::Functions::CNWSCombatRound__InitializeNumberOfAttacks>(&InitializeNumberOfAttacksHook);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCombatRound__InitializeNumberOfAttacks>(&InitializeNumberOfAttacks);
     m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCombatRound__InitializeNumberOfAttacks);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetFavoredEnemyBonus>(&GetFavoredEnemyBonus);
+    m_GetFavoredEnemyBonusHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCreatureStats__GetFavoredEnemyBonus);
 }
 
 Custom::~Custom()
@@ -84,10 +87,19 @@ ArgumentStack Custom::UnpossessCreature(ArgumentStack&& args)
     ArgumentStack stack;
     if (auto *pPlayer = player(args))
     {
-        auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidPCObject);
-        if (pCreature)
-        {
-            pCreature->UnpossessCreatureDM();
+        if (pPlayer->m_oidPCObject != pPlayer->m_oidNWSObject) {
+            auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject);
+            if (pCreature)
+            {
+                pCreature->UnpossessCreatureDM();
+            }
+
+            pPlayer->m_oidNWSObject = pPlayer->m_oidPCObject;
+            auto *pPC = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidPCObject);
+            if (pPC)
+            {
+                pPC->PossessCreature(pPlayer->m_oidPCObject);
+            }
         }
     }
 
@@ -112,7 +124,7 @@ CNWSPlayer *Custom::player(ArgumentStack& args)
     return pPlayer;
 }
 
-void Custom::InitializeNumberOfAttacksHook(API::CNWSCombatRound* pRound)
+void Custom::InitializeNumberOfAttacks(CNWSCombatRound* pRound)
 {
     m_InitializeNumberOfAttacksHook->CallOriginal<void>(pRound);
     auto *pStats = pRound->m_pBaseCreature->m_pStats;
@@ -135,6 +147,11 @@ void Custom::InitializeNumberOfAttacksHook(API::CNWSCombatRound* pRound)
         }
     }
     */
+}
+
+int32_t Custom::GetFavoredEnemyBonus(CNWSCreatureStats* pStats, CNWSCreature* pOtherCreature)
+{
+    return m_GetFavoredEnemyBonusHook->CallOriginal<int32_t>(pStats, pOtherCreature) * 2;
 }
 
 int Custom::GetLevelByClass(NWNXLib::API::CNWSCreatureStats *pStats, uint32_t nClassType)
