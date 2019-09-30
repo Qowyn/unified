@@ -1,10 +1,21 @@
 #include "Custom.hpp"
 #include "API/CAppManager.hpp"
+#include "API/CExoLinkedListInternal.hpp"
+#include "API/CExoLinkedListNode.hpp"
+#include "API/CExoLinkedListTemplatedCNWSClient.hpp"
+#include "API/CExoLinkedListTemplatedlongunsignedint.hpp"
+#include "API/CFactionManager.hpp"
+#include "API/CGameObjectArray.hpp"
+#include "API/CGameObjectArrayNode.hpp"
 #include "API/CServerExoApp.hpp"
+#include "API/CServerExoAppInternal.hpp"
 #include "API/CNWSCombatRound.hpp"
 #include "API/CNWSCreature.hpp"
 #include "API/CNWSCreatureStats.hpp"
+#include "API/CNWSFaction.hpp"
+#include "API/CNWSModule.hpp"
 #include "API/CNWSPlayer.hpp"
+#include "API/CWorldTimer.hpp"
 #include "API/Functions.hpp"
 #include "API/Globals.hpp"
 #include "API/Constants.hpp"
@@ -44,6 +55,14 @@ namespace Custom {
 
 static NWNXLib::Hooking::FunctionHook* m_InitializeNumberOfAttacksHook;
 static NWNXLib::Hooking::FunctionHook* m_GetFavoredEnemyBonusHook;
+static NWNXLib::Hooking::FunctionHook* m_SetAreaHook;
+static NWNXLib::Hooking::FunctionHook* m_HandlePlayerToServerInputMessageHook;
+static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__SendServerToPlayerParty_ListHook;
+static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook;
+static NWNXLib::Hooking::FunctionHook* m_CWorldTimer__PauseWorldTimerHook;
+static std::unordered_map<Types::ObjectID, std::vector<Types::ObjectID>> timeStopAreas;
+static std::vector<Types::ObjectID> pauseAreas;
+static std::unordered_map<Types::ObjectID, CWorldTimer> areaTimers;
 
 Custom::Custom(const Plugin::CreateParams& params)
     : Plugin(params)
@@ -53,11 +72,46 @@ Custom::Custom(const Plugin::CreateParams& params)
 
     REGISTER(PossessCreature);
     REGISTER(UnpossessCreature);
+    REGISTER(GetFactionCount);
+    REGISTER(GetFactionId);
+    REGISTER(SetFactionId);
+    REGISTER(GetFactionName);
 #undef REGISTER
     GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCombatRound__InitializeNumberOfAttacks>(&InitializeNumberOfAttacks);
     m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCombatRound__InitializeNumberOfAttacks);
     GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetFavoredEnemyBonus>(&GetFavoredEnemyBonus);
     m_GetFavoredEnemyBonusHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCreatureStats__GetFavoredEnemyBonus);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSEffectListHandler__OnApplyTimestop>(&CNWSEffectListHandler__OnApplyTimestop);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSEffectListHandler__OnRemoveTimestop>(&CNWSEffectListHandler__OnRemoveTimestop);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSObject__SetArea>(&CNWSObject__SetArea);
+    m_SetAreaHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSObject__SetArea);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__SendServerToPlayerModule_SetPauseState>(&CNWSMessage__SendServerToPlayerModule_SetPauseState);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoAppInternal__IsOnActiveExclusionList>(&CServerExoAppInternal__IsOnActiveExclusionList);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoAppInternal__IsOnExclusionList>(&CServerExoAppInternal__IsOnActiveExclusionList);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__HandlePlayerToServerInputMessage>(&CNWSMessage__HandlePlayerToServerInputMessage);
+    m_HandlePlayerToServerInputMessageHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSMessage__HandlePlayerToServerInputMessage);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetUnarmedDamageDice>(&CNWSCreatureStats__GetUnarmedDamageDice);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetUnarmedDamageDie>(&CNWSCreatureStats__GetUnarmedDamageDie);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__SendServerToPlayerParty_List>(&CNWSMessage__SendServerToPlayerParty_List);
+    m_CNWSMessage__SendServerToPlayerParty_ListHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSMessage__SendServerToPlayerParty_List);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__WriteGameObjUpdate_PartyAIState>(&CNWSMessage__WriteGameObjUpdate_PartyAIState);
+    m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSMessage__WriteGameObjUpdate_PartyAIState);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CWorldTimer__PauseWorldTimer>(&CWorldTimer__PauseWorldTimer);
+    m_CWorldTimer__PauseWorldTimerHook = GetServices()->m_hooks->FindHookByAddress(Functions::CWorldTimer__PauseWorldTimer);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CWorldTimer__UnpauseWorldTimer>(&CWorldTimer__UnpauseWorldTimer);
+    GetServices()->m_hooks->RequestSharedHook<API::Functions::CServerExoAppInternal__MainLoop, int32_t>(
+            +[](Services::Hooks::CallType type, CServerExoAppInternal* pInternal)
+            {
+                if (type == Services::Hooks::CallType::BEFORE_ORIGINAL)
+                {
+                    if (pInternal->m_nPauseState != 0)
+                    {
+                        pInternal->m_pWorldTimer->SetSnapshotTime();
+                    }
+                }
+            });
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoApp__GetActivePauseState>(&CServerExoApp__GetActivePauseState);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoAppInternal__GetActiveTimer>(&CServerExoAppInternal__GetActiveTimer);
 }
 
 Custom::~Custom()
@@ -70,12 +124,29 @@ ArgumentStack Custom::PossessCreature(ArgumentStack&& args)
     if (auto *pPlayer = player(args))
     {
         const auto creatureId = Services::Events::ExtractArgument<Types::ObjectID>(args);
-        auto nMode = Services::Events::ExtractArgument<int32_t>(args);
 
-        auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidPCObject);
-        if (pCreature)
+        auto *pOldCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject);
+        auto *pNewCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(creatureId);
+        if (pNewCreature && pOldCreature && pNewCreature->m_nAssociateType == 0 && !pNewCreature->m_pStats->m_bIsPC && !pNewCreature->m_pStats->m_bIsDM && !pNewCreature->GetDead())
         {
-            pCreature->PossessCreatureDM(creatureId, nMode);
+            auto *pArea = Globals::AppManager()->m_pServerExoApp->GetAreaByGameObjectID(pNewCreature->m_oidArea);
+            pOldCreature->PossessCreature(creatureId);
+            if (!pOldCreature->m_pStats->m_bIsPC)
+            {
+                pOldCreature->m_oidMaster = 0;
+                pOldCreature->m_nAssociateType = 0;
+            }
+            pNewCreature->m_oidMaster = pPlayer->m_oidPCObject;
+            pNewCreature->m_nAssociateType = 7;
+            if (pOldCreature->m_oidArea != pNewCreature->m_oidArea && pArea)
+            {
+                pNewCreature->m_oidDesiredArea = pNewCreature->m_oidArea;
+                pNewCreature->m_vDesiredAreaLocation = pNewCreature->m_vPosition;
+                pNewCreature->m_bDesiredAreaUpdateComplete = 0;
+
+                auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+                pMessage->SendServerToPlayerArea_ClientArea(pPlayer, pArea, pNewCreature->m_vPosition.x, pNewCreature->m_vPosition.y, pNewCreature->m_vPosition.z, pNewCreature->m_vOrientation, 0);
+            }
         }
     }
 
@@ -87,21 +158,84 @@ ArgumentStack Custom::UnpossessCreature(ArgumentStack&& args)
     ArgumentStack stack;
     if (auto *pPlayer = player(args))
     {
-        if (pPlayer->m_oidPCObject != pPlayer->m_oidNWSObject) {
-            auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject);
-            if (pCreature)
+        auto *pOldCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject);
+        auto *pNewCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidPCObject);
+        if (pNewCreature && pOldCreature && pOldCreature != pNewCreature)
+        {
+            auto *pArea = Globals::AppManager()->m_pServerExoApp->GetAreaByGameObjectID(pNewCreature->m_oidArea);
+            pOldCreature->PossessCreature(pPlayer->m_oidPCObject);
+            pOldCreature->m_oidMaster = 0;
+            pOldCreature->m_nAssociateType = 0;
+            if (pOldCreature->m_oidArea != pNewCreature->m_oidArea && pArea)
             {
-                pCreature->UnpossessCreatureDM();
-            }
+                pNewCreature->m_oidDesiredArea = pNewCreature->m_oidArea;
+                pNewCreature->m_vDesiredAreaLocation = pNewCreature->m_vPosition;
+                pNewCreature->m_bDesiredAreaUpdateComplete = 0;
 
-            pPlayer->m_oidNWSObject = pPlayer->m_oidPCObject;
-            auto *pPC = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidPCObject);
-            if (pPC)
-            {
-                pPC->PossessCreature(pPlayer->m_oidPCObject);
+                auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+                pMessage->SendServerToPlayerArea_ClientArea(pPlayer, pArea, pNewCreature->m_vPosition.x, pNewCreature->m_vPosition.y, pNewCreature->m_vPosition.z, pNewCreature->m_vOrientation, 0);
             }
         }
     }
+
+    return stack;
+}
+
+ArgumentStack Custom::GetFactionCount(ArgumentStack&&)
+{
+    ArgumentStack stack;
+    int32_t retVal = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_pFactionManager->m_nNPCFactionCount;
+
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::GetFactionId(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+    int32_t retVal = -1;
+
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    if (nObjectId != OBJECT_INVALID)
+    {
+        Globals::AppManager()->m_pServerExoApp->GetFactionOfObject(nObjectId, &retVal);
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::SetFactionId(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+    
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto nFactionId = Services::Events::ExtractArgument<int32_t>(args);
+
+    auto *pFaction = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_pFactionManager->GetFaction(nFactionId);
+    if (pFaction)
+    {
+        pFaction->AddMember(nObjectId, 0);
+    }
+
+    return stack;
+}
+
+ArgumentStack Custom::GetFactionName(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+    std::string retVal;
+
+    auto nFactionId = Services::Events::ExtractArgument<int32_t>(args);
+
+    auto *pFaction = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_pFactionManager->GetFaction(nFactionId);
+    if (pFaction && pFaction->m_sFactionName.CStr())
+    {
+        retVal = std::string(pFaction->m_sFactionName.CStr());
+    }
+
+    Services::Events::InsertArgument(stack, retVal);
 
     return stack;
 }
@@ -137,16 +271,6 @@ void Custom::InitializeNumberOfAttacks(CNWSCombatRound* pRound)
             pRound->m_nAdditionalAttacks += 1;
         }
     }
-    /*
-    if (pStats->HasFeat(1116)) // Combat Reflexes
-    {
-        int nDex = pStats->GetDEXMod(0);
-        if (nDex > 0)
-        {
-            pRound->m_nAttacksOfOpportunity += nDex;
-        }
-    }
-    */
 }
 
 int32_t Custom::GetFavoredEnemyBonus(CNWSCreatureStats* pStats, CNWSCreature* pOtherCreature)
@@ -163,6 +287,551 @@ int Custom::GetLevelByClass(NWNXLib::API::CNWSCreatureStats *pStats, uint32_t nC
     }
 
     return 0;
+}
+
+int32_t Custom::CNWSEffectListHandler__OnApplyTimestop(NWNXLib::API::CNWSEffectListHandler*, NWNXLib::API::CNWSObject *pObj, NWNXLib::API::CGameEffect*, int32_t)
+{
+    if (pObj->m_oidArea != OBJECT_INVALID)
+    {
+        auto &tsObjects = timeStopAreas[pObj->m_oidArea];
+        if (std::find(std::begin(tsObjects), std::end(tsObjects), pObj->m_idSelf) == std::end(tsObjects)) tsObjects.push_back(pObj->m_idSelf);
+        InitTimer(pObj->m_oidArea);
+
+        auto *pServer = Globals::AppManager()->m_pServerExoApp;
+        auto bWasTS = pServer->GetPauseState(1) != 0;
+        auto bIsTS = timeStopAreas.size() > 0;
+
+        pServer->AddToExclusionList(pObj->m_idSelf, 1);
+
+        if (bWasTS != bIsTS)
+        {
+            pServer->TogglePauseState(1);
+        }
+        else if (bIsTS)
+        {
+            auto *pMessage = static_cast<CNWSMessage*>(pServer->GetNWSMessage());
+            pMessage->SendServerToPlayerModule_SetPauseState(1, 1);
+        }
+    }
+    return 0;
+}
+
+int32_t Custom::CNWSEffectListHandler__OnRemoveTimestop(NWNXLib::API::CNWSEffectListHandler*, NWNXLib::API::CNWSObject *pObj, NWNXLib::API::CGameEffect*)
+{
+    if (pObj->m_oidArea != OBJECT_INVALID)
+    {
+        auto bAllTimestopsGone = TimestopCount(pObj) < 2;
+
+        if (!bAllTimestopsGone) return 1;
+
+        auto &tsObjects = timeStopAreas.at(pObj->m_oidArea);
+        tsObjects.erase(std::find(std::begin(tsObjects), std::end(tsObjects), pObj->m_idSelf));
+        if (!tsObjects.size())
+        {
+            timeStopAreas.erase(pObj->m_oidArea);
+            ResetTimer(pObj->m_oidArea);
+        }
+
+        if (pObj->m_nObjectType != ObjectType::Creature || !IsDM(static_cast<CNWSCreature*>(pObj)))
+        {
+            Globals::AppManager()->m_pServerExoApp->RemoveFromExclusionList(pObj->m_idSelf, 1);
+        }
+
+        if (timeStopAreas.size() <= 0)
+        {
+            Globals::AppManager()->m_pServerExoApp->SetPauseState(1, 0);
+        }
+        else
+        {
+            auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+            pMessage->SendServerToPlayerModule_SetPauseState(1, 1);
+        }
+    }
+    return 1;
+}
+
+void Custom::CNWSObject__SetArea(NWNXLib::API::CNWSObject* pObj, NWNXLib::API::CNWSArea* pArea)
+{
+    Types::ObjectID oldAreaId = pObj->m_oidArea;
+    Types::ObjectID newAreaId = pArea ? pArea->m_idSelf : OBJECT_INVALID;
+
+    m_SetAreaHook->CallOriginal<void>(pObj, pArea);
+
+    if (newAreaId != oldAreaId)
+    {
+        CNWSObject__SetAreaPost(pObj, oldAreaId, newAreaId);
+    }
+}
+
+void Custom::CNWSObject__SetAreaPost(NWNXLib::API::CNWSObject* pObj, uint32_t oldAreaId, uint32_t newAreaId)
+{
+    if (!Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_nPauseState) return;
+
+    if (HasTimestop(pObj))
+    {
+        if (oldAreaId != OBJECT_INVALID)
+        {
+            auto &tsObjects = timeStopAreas.at(oldAreaId);
+            tsObjects.erase(std::find(std::begin(tsObjects), std::end(tsObjects), pObj->m_idSelf));
+            if (!tsObjects.size())
+            {
+                timeStopAreas.erase(oldAreaId);
+                ResetTimer(oldAreaId);
+            }
+        }
+
+        if (newAreaId != OBJECT_INVALID)
+        {
+            auto &tsObjects = timeStopAreas[newAreaId];
+            tsObjects.push_back(pObj->m_idSelf);
+            InitTimer(newAreaId);
+        }
+
+        auto bWasTS = Globals::AppManager()->m_pServerExoApp->GetPauseState(1) != 0;
+        auto bIsTS = timeStopAreas.size() > 0;
+
+        if (bWasTS != bIsTS)
+        {
+            Globals::AppManager()->m_pServerExoApp->TogglePauseState(1);
+        }
+        else if (bIsTS)
+        {
+            auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+            pMessage->SendServerToPlayerModule_SetPauseState(1, 1);
+        }
+
+        if (pObj->m_nObjectType != ObjectType::Creature) return;
+
+        if (auto *pClient = Globals::AppManager()->m_pServerExoApp->GetClientObjectByObjectId(pObj->m_idSelf))
+        {
+            auto bWasPause = std::find(pauseAreas.begin(), pauseAreas.end(), oldAreaId) != pauseAreas.end();
+            auto bIsPause = std::find(pauseAreas.begin(), pauseAreas.end(), newAreaId) != pauseAreas.end();
+            if (bIsPause != bWasPause)
+            {
+                auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+                SendPauseState(pMessage, 2, bIsPause, pClient->m_nPlayerID);
+            }
+        }
+        return;
+    }
+
+    if (pObj->m_nObjectType == ObjectType::Creature)
+    {
+        if (auto *pClient = Globals::AppManager()->m_pServerExoApp->GetClientObjectByObjectId(pObj->m_idSelf))
+        {
+            auto bWasTS = timeStopAreas.find(oldAreaId) != timeStopAreas.end();
+            auto bIsTS = timeStopAreas.find(newAreaId) != timeStopAreas.end();
+            if (bIsTS != bWasTS)
+            {
+                auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+                SendPauseState(pMessage, 1, bIsTS, pClient->m_nPlayerID);
+            }
+            auto bWasPause = std::find(pauseAreas.begin(), pauseAreas.end(), oldAreaId) != pauseAreas.end();
+            auto bIsPause = std::find(pauseAreas.begin(), pauseAreas.end(), newAreaId) != pauseAreas.end();
+            if (bIsPause != bWasPause)
+            {
+                auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+                SendPauseState(pMessage, 2, bIsPause, pClient->m_nPlayerID);
+            }
+        }
+    }
+    
+}
+
+int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(NWNXLib::API::CNWSMessage* pMessage, uint8_t nPauseState, int32_t bPaused)
+{
+    auto *pServer = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal;
+    auto *pPlayerList = pServer->m_pNWSPlayerList->m_pcExoLinkedListInternal;
+    if (bPaused)
+    {
+        // Get Player Counts
+        uint32_t nSeePause = 0;
+        auto nPlayerCount = pPlayerList->m_nCount;
+        for (auto *pPlayerNode = pPlayerList->pHead; pPlayerNode; pPlayerNode = pPlayerNode->pNext)
+        {
+            if (auto *pPlayer = static_cast<CNWSPlayer*>(pPlayerNode->pObject))
+            {
+                if (auto *pCreature = pServer->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject))
+                {
+                    if (nPauseState == 1 && timeStopAreas.find(pCreature->m_oidArea) != timeStopAreas.end())
+                    {
+                        nSeePause++;
+                    }
+                    else if (nPauseState == 2 && std::find(pauseAreas.begin(), pauseAreas.end(), pCreature->m_oidArea) != pauseAreas.end())
+                    {
+                        nSeePause++;
+                    }
+                }
+            }
+        }
+
+        if (nSeePause > 0)
+        {
+            unsigned char* szMessage;
+            uint32_t messageSize;
+            pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
+            pMessage->WriteBYTE(nPauseState, 2);
+            pMessage->WriteBOOL(1);
+            auto *pExclusionList = nPauseState == 1 ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
+            pMessage->WriteWORD(pExclusionList->m_nCount, 16);
+            for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+            {
+                pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+            }
+
+            pMessage->GetWriteMessage(&szMessage, &messageSize);
+
+            for (auto *pPlayerNode = pPlayerList->pHead; pPlayerNode; pPlayerNode = pPlayerNode->pNext)
+            {
+                if (auto *pPlayer = static_cast<CNWSPlayer*>(pPlayerNode->pObject))
+                {
+                    if (auto *pCreature = pServer->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject))
+                    {
+                        if (nPauseState == 1 && timeStopAreas.find(pCreature->m_oidArea) != timeStopAreas.end())
+                        {
+                            pMessage->SendServerToPlayerMessage(pPlayer->m_nPlayerID, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+                        }
+                        else if (nPauseState == 2 && std::find(pauseAreas.begin(), pauseAreas.end(), pCreature->m_oidArea) != pauseAreas.end())
+                        {
+                            pMessage->SendServerToPlayerMessage(pPlayer->m_nPlayerID, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (nPlayerCount > nSeePause)
+        {
+            unsigned char* szMessage;
+            uint32_t messageSize;
+            pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
+            pMessage->WriteBYTE(pServer->m_nPauseState, 2);
+            pMessage->WriteBOOL(0);
+            auto *pExclusionList = nPauseState == 2 ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
+            pMessage->WriteWORD(pExclusionList->m_nCount, 16);
+            for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+            {
+                pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+            }
+            pMessage->GetWriteMessage(&szMessage, &messageSize);
+
+            for (auto *pPlayerNode = pPlayerList->pHead; pPlayerNode; pPlayerNode = pPlayerNode->pNext)
+            {
+                if (auto *pPlayer = static_cast<CNWSPlayer*>(pPlayerNode->pObject))
+                {
+                    if (auto *pCreature = pServer->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject))
+                    {
+                        if (nPauseState == 1 && timeStopAreas.find(pCreature->m_oidArea) == timeStopAreas.end())
+                        {
+                            pMessage->SendServerToPlayerMessage(pPlayer->m_nPlayerID, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+                        }
+                        else if (nPauseState == 2 && std::find(pauseAreas.begin(), pauseAreas.end(), pCreature->m_oidArea) == pauseAreas.end())
+                        {
+                            pMessage->SendServerToPlayerMessage(pPlayer->m_nPlayerID, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+                        }
+                    }
+                    else
+                    {
+                        pMessage->SendServerToPlayerMessage(pPlayer->m_nPlayerID, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        unsigned char* szMessage;
+        uint32_t messageSize;
+        pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
+        pMessage->WriteBYTE(nPauseState, 2);
+        pMessage->WriteBOOL(0);
+        auto *pExclusionList = nPauseState == 2 ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
+        pMessage->WriteWORD(pExclusionList->m_nCount, 16);
+        for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+        {
+            pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+        }
+        pMessage->GetWriteMessage(&szMessage, &messageSize);
+
+        for (auto *pPlayerNode = pPlayerList->pHead; pPlayerNode; pPlayerNode = pPlayerNode->pNext)
+        {
+            if (auto *pPlayer = static_cast<CNWSPlayer*>(pPlayerNode->pObject))
+            {
+                pMessage->SendServerToPlayerMessage(pPlayer->m_nPlayerID, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+            }
+        }
+    }
+    return 1;
+}
+
+void Custom::SendPauseState(NWNXLib::API::CNWSMessage* pMessage, int32_t nPauseState, bool bPaused, uint32_t nPlayerId)
+{
+    unsigned char* szMessage;
+    uint32_t messageSize;
+
+    auto* pServer = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal;
+    pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
+    pMessage->WriteBYTE(nPauseState, 2);
+    pMessage->WriteBOOL(bPaused);
+
+    auto *pExclusionList = (nPauseState == 1) == bPaused ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
+    pMessage->WriteWORD(pExclusionList->m_nCount, 16);
+    for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+    {
+        pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+    }
+
+    pMessage->GetWriteMessage(&szMessage, &messageSize);
+
+    pMessage->SendServerToPlayerMessage(nPlayerId, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
+}
+
+bool Custom::HasTimestop(NWNXLib::API::CNWSObject *pCreature)
+{
+    auto pEffects = &pCreature->m_appliedEffects;
+    if (!pEffects->element) return false;
+
+    for (int32_t n = 0; n < pEffects->num; n++)
+    {
+        auto *pEffect = pEffects->element[n];
+        if (pEffect->m_nType == EffectTrueType::Timestop) return true;
+    }
+
+    return false;
+}
+
+int32_t Custom::TimestopCount(NWNXLib::API::CNWSObject* pCreature)
+{
+    auto result = 0;
+    auto pEffects = &pCreature->m_appliedEffects;
+    if (!pEffects->element) return result;
+
+    for (int32_t n = 0; n < pEffects->num; n++)
+    {
+        auto *pEffect = pEffects->element[n];
+        if (pEffect->m_nType == EffectTrueType::Timestop) result++;
+    }
+
+    return result;
+}
+
+bool Custom::IsDM(NWNXLib::API::CNWSCreature *pCreature)
+{
+    if (!pCreature->m_bPlayerCharacter) return false;
+
+    auto *playerList = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_pNWSPlayerList->m_pcExoLinkedListInternal;
+    for (auto *playerNode = playerList->pHead; playerNode; playerNode = playerNode->pNext)
+    {
+        auto *player = static_cast<CNWSPlayer*>(playerNode->pObject);
+        if (player && player->m_oidPCObject == pCreature->m_idSelf)
+        {
+            return player->m_nCharacterType == CharacterType::DM;
+        }
+    }
+
+    return false;
+}
+
+int32_t Custom::CServerExoAppInternal__IsOnActiveExclusionList(NWNXLib::API::CServerExoAppInternal* pInternal, uint32_t nObjectId)
+{
+    if (auto *pGObj = pInternal->GetGameObject(nObjectId))
+    {
+        if (auto *pObj = Utils::AsNWSObject(pGObj))
+        {
+            if (std::find(pauseAreas.begin(), pauseAreas.end(), pObj->m_oidArea) != pauseAreas.end() && !IsOnExclusionList(nObjectId, pInternal->m_lstPauseExclusionList->m_pcExoLinkedListInternal))
+            {
+                return 0;
+            }
+            if (timeStopAreas.find(pObj->m_oidArea) != timeStopAreas.end() && !IsOnExclusionList(nObjectId, pInternal->m_lstTimestopExclusionList->m_pcExoLinkedListInternal))
+            {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+int32_t Custom::CNWSMessage__HandlePlayerToServerInputMessage(NWNXLib::API::CNWSMessage* pMessage, NWNXLib::API::CNWSPlayer* pPlayer, uint8_t nMinor)
+{
+    if (nMinor != MessageInputMinor::TogglePauseRequest)
+    {
+        return m_HandlePlayerToServerInputMessageHook->CallOriginal<int32_t>(pMessage, pPlayer, nMinor);
+    }
+
+    if (pPlayer->m_nCharacterType != CharacterType::DM) return 0;
+
+    auto *pPC = pPlayer->GetGameObject();
+
+    if (!pPC || pPC->m_oidArea == OBJECT_INVALID) return 0;
+
+    auto iter = std::find(pauseAreas.begin(), pauseAreas.end(), pPC->m_oidArea);
+
+    if (iter == pauseAreas.end())
+    {
+        pauseAreas.push_back(pPC->m_oidArea);
+        InitTimer(pPC->m_oidArea);
+    }
+    else
+    {
+        pauseAreas.erase(iter);
+        ResetTimer(pPC->m_oidArea);
+    }
+
+    auto bWasPaused = Globals::AppManager()->m_pServerExoApp->GetPauseState(2) != 0;
+    auto bIsPaused = pauseAreas.size() > 0;
+
+    if (bWasPaused != bIsPaused)
+    {
+        Globals::AppManager()->m_pServerExoApp->TogglePauseState(2);
+    }
+    else if (bIsPaused)
+    {
+        auto *pMessage = static_cast<CNWSMessage*>(Globals::AppManager()->m_pServerExoApp->GetNWSMessage());
+        pMessage->SendServerToPlayerModule_SetPauseState(2, 1);
+    }
+
+    return 0;
+}
+
+void Custom::CWorldTimer__PauseWorldTimer(NWNXLib::API::CWorldTimer*) {}
+void Custom::CWorldTimer__UnpauseWorldTimer(NWNXLib::API::CWorldTimer*) {}
+
+uint8_t Custom::CServerExoApp__GetActivePauseState(CServerExoApp*)
+{
+    return 0;
+}
+
+uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDice(NWNXLib::API::CNWSCreatureStats* pStats)
+{
+    if (!pStats->m_pBaseCreature->GetUseMonkAbilities())
+    {
+        return 1;
+    }
+
+    auto nMonkLevel = GetLevelByClass(pStats, ClassType::Monk);
+    auto nSize = pStats->m_pBaseCreature->m_nCreatureSize;
+
+    if (nSize < 3)
+    {
+        return nMonkLevel >= 16 ? 2 : 1;
+    }
+    else
+    {
+        return nMonkLevel >= 12 ? 2 : 1;
+    }
+}
+
+uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDie(NWNXLib::API::CNWSCreatureStats* pStats)
+{
+    auto nSize = pStats->m_pBaseCreature->m_nCreatureSize;
+    if (!pStats->m_pBaseCreature->GetUseMonkAbilities())
+    {
+        return nSize < 3 ? 2 : 3;
+    }
+
+    auto nMonkLevel = GetLevelByClass(pStats, ClassType::Monk);
+
+    if (nSize < 3)
+    {
+        if (nMonkLevel >= 20) return 8;
+        if (nMonkLevel >= 16) return 6;
+        if (nMonkLevel >= 12) return 10;
+        if (nMonkLevel >= 8) return 8;
+        if (nMonkLevel >= 4) return 6;
+        if (nMonkLevel >= 1) return 4;
+        return 2;
+    }
+    else
+    {
+        if (nMonkLevel >= 20) return 10;
+        if (nMonkLevel >= 16) return 8;
+        if (nMonkLevel >= 12) return 6;
+        if (nMonkLevel >= 8) return 10;
+        if (nMonkLevel >= 4) return 8;
+        if (nMonkLevel >= 1) return 6;
+        return 3;
+    }
+}
+
+int32_t Custom::CNWSMessage__SendServerToPlayerParty_List(CNWSMessage* pMessage, uint32_t nPlayerID, int32_t nMemberCount, uint32_t* pMembers, uint8_t unk1, uint32_t unk2)
+{
+    if (auto *pClient = static_cast<CNWSPlayer*>(Globals::AppManager()->m_pServerExoApp->GetClientObjectByPlayerId(nPlayerID, 0)))
+    {
+        if (pClient->m_nCharacterType != CharacterType::DM)
+        {
+            if (auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pClient->m_oidNWSObject))
+            {
+                if (pCreature->m_nAssociateType == 7)
+                {
+                    nMemberCount = 0;
+                }
+            }
+        }
+    }
+    return m_CNWSMessage__SendServerToPlayerParty_ListHook->CallOriginal<int32_t>(pMessage, nPlayerID, nMemberCount, pMembers, unk1, unk2);
+}
+
+int32_t Custom::CNWSMessage__WriteGameObjUpdate_PartyAIState(CNWSMessage* pMessage, CNWSPlayer* pClient)
+{
+    if (pClient->m_nCharacterType != CharacterType::DM)
+    {
+        if (auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pClient->m_oidNWSObject))
+        {
+            if (pCreature->m_nAssociateType == 7)
+            {
+                return 1;
+            }
+        }
+    }
+    return m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook->CallOriginal<int32_t>(pMessage, pClient);
+}
+
+CWorldTimer* Custom::CServerExoAppInternal__GetActiveTimer(CServerExoAppInternal* pInternal, uint32_t nOID)
+{
+    if (pInternal->m_nPauseState == 0) return pInternal->m_pWorldTimer;
+    if (auto *pObj = Utils::AsNWSObject(pInternal->GetGameObject(nOID)))
+    {
+        if (std::find(pauseAreas.begin(), pauseAreas.end(), pObj->m_oidArea) != pauseAreas.end() && !IsOnExclusionList(nOID, pInternal->m_lstPauseExclusionList->m_pcExoLinkedListInternal))
+        {
+            return &areaTimers.at(pObj->m_oidArea);
+        }
+        if (timeStopAreas.find(pObj->m_oidArea) != timeStopAreas.end() && !IsOnExclusionList(nOID, pInternal->m_lstTimestopExclusionList->m_pcExoLinkedListInternal))
+        {
+            return &areaTimers.at(pObj->m_oidArea);
+        }
+    }
+    return pInternal->m_pWorldTimer;
+}
+
+bool Custom::IsOnExclusionList(uint32_t nOID, CExoLinkedListInternal* pExclusionList)
+{
+    for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+    {
+        if (reinterpret_cast<uint32_t>(pNode->pObject) == nOID) return true;
+    }
+    return false;
+}
+
+void Custom::InitTimer(uint32_t nArea)
+{
+    auto &areaTimer = areaTimers[nArea];
+    if (!areaTimer.m_bPaused)
+    {
+        auto *worldTimer = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_pWorldTimer;
+        areaTimer.m_nTimeSnapshot = worldTimer->m_nTimeSnapshot;
+        areaTimer.m_nMillisecondsPerDay = worldTimer->m_nMillisecondsPerDay;
+        areaTimer.m_nCalendarDayAdjustment = worldTimer->m_nCalendarDayAdjustment;
+        areaTimer.m_nTimeOfDayAdjustment = worldTimer->m_nTimeOfDayAdjustment;
+        m_CWorldTimer__PauseWorldTimerHook->CallOriginal<void>(areaTimer);
+    }
+}
+
+void Custom::ResetTimer(uint32_t nArea)
+{
+    if (std::find(pauseAreas.begin(), pauseAreas.end(), nArea) == pauseAreas.end() && timeStopAreas.find(nArea) == timeStopAreas.end())
+    {
+        areaTimers[nArea].m_bPaused = false;
+    }
 }
 
 }
