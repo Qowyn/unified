@@ -58,7 +58,8 @@ Race::Race(const Plugin::CreateParams& params)
     : Plugin(params)
 {
 #define REGISTER(func) \
-    GetServices()->m_events->RegisterEvent(#func, std::bind(&Race::func, this, std::placeholders::_1))
+    GetServices()->m_events->RegisterEvent(#func, \
+        [this](ArgumentStack&& args){ return func(std::move(args)); })
 
     REGISTER(SetRacialModifier);
     REGISTER(GetParentRace);
@@ -68,55 +69,55 @@ Race::Race(const Plugin::CreateParams& params)
     m_ShowEffectIcon = GetServices()->m_config->Get<bool>("SHOW_EFFECT_ICON", false);
 
     // Most racial adjustments are done here using effects only once per server reset or after a level up
-    GetServices()->m_hooks->RequestSharedHook<Functions::CServerExoAppInternal__LoadCharacterFinish, void, CServerExoAppInternal*, CNWSPlayer*, int32_t, int32_t>(&LoadCharacterFinishHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CServerExoAppInternal19LoadCharacterFinishEP10CNWSPlayerii, void, CServerExoAppInternal*, CNWSPlayer*, int32_t, int32_t>(&LoadCharacterFinishHook);
 
     // We want the racial bonuses to not count toward limits
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreature__GetTotalEffectBonus, int32_t, CNWSCreature*, uint8_t, CNWSObject*, int32_t, int32_t, uint8_t, uint8_t, uint8_t, uint8_t, int32_t>(&GetTotalEffectBonusHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreature__SavingThrowRoll, int32_t, CNWSCreature*, uint8_t, uint16_t, uint8_t, uint32_t, int32_t, uint16_t, int32_t>(&SavingThrowRollHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreature__GetWeaponPower, int32_t, CNWSCreature*, CNWSObject*, int32_t>(&GetWeaponPowerHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN12CNWSCreature19GetTotalEffectBonusEhP10CNWSObjectiihhhhi, int32_t, CNWSCreature*, uint8_t, CNWSObject*, int32_t, int32_t, uint8_t, uint8_t, uint8_t, uint8_t, int32_t>(&GetTotalEffectBonusHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN12CNWSCreature15SavingThrowRollEhthjiti, int32_t, CNWSCreature*, uint8_t, uint16_t, uint8_t, uint32_t, int32_t, uint16_t, int32_t>(&SavingThrowRollHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN12CNWSCreature14GetWeaponPowerEP10CNWSObjecti, int32_t, CNWSCreature*, CNWSObject*, int32_t>(&GetWeaponPowerHook);
 
     // Make effects applied to parent races effect every child race
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyAttackIncrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyAttackDecrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyConcealment, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyDamageIncrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyDamageDecrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyEffectImmunity, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyACDecrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyACIncrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplyInvisibility, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplySanctuary, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplySavingThrowDecrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplySavingThrowIncrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplySkillDecrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSEffectListHandler__OnApplySkillIncrease, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler21OnApplyAttackIncreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler21OnApplyAttackDecreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler18OnApplyConcealmentEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler21OnApplyDamageIncreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler21OnApplyDamageDecreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler21OnApplyEffectImmunityEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler17OnApplyACDecreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler17OnApplyACIncreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler19OnApplyInvisibilityEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler16OnApplySanctuaryEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler26OnApplySavingThrowDecreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler26OnApplySavingThrowIncreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler20OnApplySkillDecreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CNWSEffectListHandler20OnApplySkillIncreaseEP10CNWSObjectP11CGameEffecti, int32_t, CNWSEffectListHandler*, CNWSObject*, CGameEffect*, int32_t>(&ApplyEffectHook);
 
     // Special hook for resetting the feat usages after rest etc.
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreatureStats__ResetFeatRemainingUses, void, CNWSCreatureStats*>(&ResetFeatRemainingUsesHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN17CNWSCreatureStats22ResetFeatRemainingUsesEv, void, CNWSCreatureStats*>(&ResetFeatRemainingUsesHook);
 
     // Completely rewritten in NWNX for Race plugin so we can add our Initiative changes
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreature__ResolveInitiative, void, CNWSCreature*>(&ResolveInitiativeHook);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN12CNWSCreature17ResolveInitiativeEv, void, CNWSCreature*>(&ResolveInitiativeHook);
 
     // If a level up has been confirmed we rerun the racial applications in case of new feats, level based adjustments etc.
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSMessage__SendServerToPlayerLevelUp_Confirmation, int32_t, CNWSMessage*, Types::PlayerID, int32_t>(&SendServerToPlayerLevelUp_ConfirmationHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN11CNWSMessage38SendServerToPlayerLevelUp_ConfirmationEji, int32_t, CNWSMessage*, Types::PlayerID, int32_t>(&SendServerToPlayerLevelUp_ConfirmationHook);
 
     // Swap race with parent race due to hardcoded checks here
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreatureStats__GetFavoredEnemyBonus, int32_t, CNWSCreatureStats*, CNWSCreature*>(&GetFavoredEnemyBonusHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreature__CreateDefaultQuickButtons, void, CNWSCreature*>(&CreateDefaultQuickButtonsHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreatureStats__LevelUpAutomatic, int32_t, CNWSCreatureStats*, uint8_t, int32_t, uint8_t>(&LevelUpAutomaticHook);
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWSCreatureStats__GetMeetsPrestigeClassRequirements, int32_t, CNWSCreatureStats*, CNWClass*>(&GetMeetsPrestigeClassRequirementsHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN17CNWSCreatureStats20GetFavoredEnemyBonusEP12CNWSCreature, int32_t, CNWSCreatureStats*, CNWSCreature*>(&GetFavoredEnemyBonusHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN12CNWSCreature25CreateDefaultQuickButtonsEv, void, CNWSCreature*>(&CreateDefaultQuickButtonsHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN17CNWSCreatureStats16LevelUpAutomaticEhih, int32_t, CNWSCreatureStats*, uint8_t, int32_t, uint8_t>(&LevelUpAutomaticHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN17CNWSCreatureStats33GetMeetsPrestigeClassRequirementsEP8CNWClass, int32_t, CNWSCreatureStats*, CNWClass*>(&GetMeetsPrestigeClassRequirementsHook);
 
     //Don't swap, check as both parent and child race
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreature__CheckItemRaceRestrictions>(&CheckItemRaceRestrictionsHook);
-    m_CheckRacialResHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCreature__CheckItemRaceRestrictions);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN12CNWSCreature25CheckItemRaceRestrictionsEP8CNWSItem>(&CheckItemRaceRestrictionsHook);
+    m_CheckRacialResHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN12CNWSCreature25CheckItemRaceRestrictionsEP8CNWSItem);
 
     // Need to set up default parent race to invalid before the on module load sets up the parents
-    GetServices()->m_hooks->RequestSharedHook<Functions::CNWRules__LoadRaceInfo, void, CNWRules *>(&LoadRaceInfoHook);
+    GetServices()->m_hooks->RequestSharedHook<Functions::_ZN8CNWRules12LoadRaceInfoEv, void, CNWRules *>(&LoadRaceInfoHook);
 
     // Try to hook ValidateCharacter, if we can't it means NWNX_ELC is loaded and we need to subscribe to its broadcast message instead.
     try
     {
-        GetServices()->m_hooks->RequestSharedHook<Functions::CNWSPlayer__ValidateCharacter, int32_t>(&ValidateCharacterHook);
+        GetServices()->m_hooks->RequestSharedHook<Functions::_ZN10CNWSPlayer17ValidateCharacterEPi, int32_t>(&ValidateCharacterHook);
     }
     catch (...)
     {
@@ -148,7 +149,7 @@ void Race::DoEffect(CNWSCreature *pCreature,
                     int32_t param4,
                     int32_t param5)
 {
-    auto *eff = new API::CGameEffect(true);
+    auto *eff = new CGameEffect(true);
     eff->m_oidCreator         = MODULE_OID;
     eff->m_nType              = nType;
     eff->m_nSubType           = EffectSubType::Supernatural | EffectDurationType::Innate;
@@ -476,6 +477,8 @@ void Race::ApplyEffectHook(
     if(cType == Services::Hooks::CallType::BEFORE_ORIGINAL )
     {
         CNWSCreature* tgtCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pObject->m_idSelf);
+        if (tgtCreature == nullptr)
+            return;
         uint8_t nRaceParam;
         //get the proper parameter that contains race
         switch(eff->m_nType)
@@ -490,11 +493,11 @@ void Race::ApplyEffectHook(
             default: nRaceParam = 2; break;
         }
         std::vector<uint16_t> vChild = g_plugin->m_ChildRaces[eff->m_nParamInteger[nRaceParam]];
-        API::CGameEffect *effNew;
+        CGameEffect *effNew;
         int32_t i;
         for(uint16_t & nChild : vChild)
         {
-            effNew = new API::CGameEffect(true);
+            effNew = new CGameEffect(true);
             effNew->m_nNumIntegers = eff->m_nNumIntegers;
             for(i = 0; i < eff->m_nNumIntegers; i++)
                 effNew->m_nParamInteger[i] = eff->m_nParamInteger[i];
@@ -609,13 +612,13 @@ void Race::ResolveInitiativeHook(CNWSCreature *pCreature)
         auto diceRoll = Globals::Rules()->RollDice(1, 20);
         auto mod = pStats->GetDEXMod(0);
         if (pStats->HasFeat(Feat::EpicSuperiorInitiative))
-            mod += 8;
+            mod += Globals::Rules()->GetRulesetIntEntry("EPIC_SUPERIOR_INITIATIVE_BONUS", 8);
         else if (pStats->HasFeat(Feat::ImprovedInitiative))
-            mod += 4;
+            mod += Globals::Rules()->GetRulesetIntEntry("IMPROVED_INITIATIVE_BONUS", 4);
         if (pStats->HasFeat(Feat::Blooded))
-            mod += 2;
+            mod += Globals::Rules()->GetRulesetIntEntry("BLOODED_INITIATIVE_BONUS", 2);
         if (pStats->HasFeat(Feat::Thug))
-            mod += 2;
+            mod += Globals::Rules()->GetRulesetIntEntry("THUG_INITIATIVE_BONUS", 2);
 
         // Add racial bonus
         auto nRace = pCreature->m_pStats->m_nRace;
@@ -708,7 +711,7 @@ void Race::SendServerToPlayerLevelUp_ConfirmationHook(
         if (bValidated)
         {
             auto *client = Globals::AppManager()->m_pServerExoApp->GetClientObjectByPlayerId(playerId, 0);
-            auto *pPlayer = static_cast<API::CNWSPlayer *>(client);
+            auto *pPlayer = static_cast<CNWSPlayer *>(client);
             auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pPlayer->m_oidNWSObject);
             ApplyRaceEffects(pCreature);
         }
@@ -843,7 +846,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
             }
             g_plugin->m_RaceABVsRace[raceId][param1] = param2;
             auto versusRaceName = Globals::Rules()->m_lstRaces[param1].GetNamePluralText();
-            LOG_INFO("%s: Setting Natural AB modifier vs %s to %d.", raceName, versusRaceName.CStr(), param2);
+            LOG_INFO("%s: Setting Natural AB modifier vs %s to %d.", raceName, versusRaceName, param2);
             break;
         }
         case AC:
@@ -861,7 +864,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
             }
             g_plugin->m_RaceACVsRace[raceId][param1] = param2;
             auto versusRaceName = Globals::Rules()->m_lstRaces[param1].GetNamePluralText();
-            LOG_INFO("%s: Setting Natural AC modifier vs %s to %d.", raceName, versusRaceName.CStr(), param2);
+            LOG_INFO("%s: Setting Natural AC modifier vs %s to %d.", raceName, versusRaceName, param2);
             break;
         }
         case CONCEALMENT:
@@ -920,7 +923,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
             }
             auto featName = Globals::Rules()->GetFeat(param1)->GetNameText();
             g_plugin->m_RaceFeat[raceId][param1] = param2;
-            LOG_INFO("%s: Granting %s Feat at level %d.", raceName, featName.CStr(), param2);
+            LOG_INFO("%s: Granting %s Feat at level %d.", raceName, featName, param2);
             break;
         }
         case FEATUSAGE:
@@ -932,7 +935,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
             }
             g_plugin->m_RaceFeatUsage[raceId][param1]= std::make_pair(param2, param3);
             auto featName = Globals::Rules()->GetFeat(param1)->GetNameText();
-            LOG_INFO("%s: Setting %s Feat Usage Per Day to %d + 1 for every %d level(s).", raceName, featName.CStr(), param2, param3);
+            LOG_INFO("%s: Setting %s Feat Usage Per Day to %d + 1 for every %d level(s).", raceName, featName, param2, param3);
             break;
         }
         case IMMUNITY:
@@ -967,7 +970,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
             g_plugin->m_RaceParent[raceId] = param1;
             g_plugin->m_ChildRaces[param1].push_back(raceId);
             auto parentRaceName = Globals::Rules()->m_lstRaces[param1].GetNameText();
-            LOG_INFO("%s: Setting parent race to %s.", raceName, parentRaceName.CStr());
+            LOG_INFO("%s: Setting parent race to %s.", raceName, parentRaceName);
             break;
         }
         case REGENERATION:
@@ -1031,7 +1034,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
 
             g_plugin->m_RaceSkill[raceId][param1] = param2;
             auto skillName = Globals::Rules()->m_lstSkills[param1].GetNameText();
-            LOG_INFO("%s: Setting Skill modifier of %d for %s.", raceName, param2, skillName.CStr());
+            LOG_INFO("%s: Setting Skill modifier of %d for %s.", raceName, param2, skillName);
             break;
         }
         case SPELLIMMUNITY:
@@ -1047,7 +1050,7 @@ void Race::SetRaceModifier(int32_t raceId, RaceModifier raceMod, int32_t param1,
                 g_plugin->m_RaceSpellImmunities[raceId] = immunities;
             }
             auto spellName = Globals::Rules()->m_pSpellArray[0].GetSpell(param1)->GetSpellNameText();
-            LOG_INFO("%s: Setting %s Spell Immunity.", raceName, spellName.CStr());
+            LOG_INFO("%s: Setting %s Spell Immunity.", raceName, spellName);
             break;
         }
         case SRCHARGEN:

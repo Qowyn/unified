@@ -173,7 +173,8 @@ Dialog::Dialog(const Plugin::CreateParams& params)
     : Plugin(params)
 {
 #define REGISTER(func) \
-    GetServices()->m_events->RegisterEvent(#func, std::bind(&Dialog::func, this, std::placeholders::_1))
+    GetServices()->m_events->RegisterEvent(#func, \
+        [this](ArgumentStack&& args){ return func(std::move(args)); })
 
     REGISTER(GetCurrentNodeType);
     REGISTER(GetCurrentScriptType);
@@ -181,28 +182,30 @@ Dialog::Dialog(const Plugin::CreateParams& params)
     REGISTER(GetCurrentNodeIndex);
     REGISTER(GetCurrentNodeText);
     REGISTER(SetCurrentNodeText);
+    REGISTER(End);
+
 #undef REGISTER
 
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__GetStartEntry,
+        <Functions::_ZN10CNWSDialog13GetStartEntryEP10CNWSObject,
             uint32_t, CNWSDialog*, CNWSObject*>(&Hooks::GetStartEntry);
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__GetStartEntryOneLiner,
+        <Functions::_ZN10CNWSDialog21GetStartEntryOneLinerEP10CNWSObjectR13CExoLocStringR7CResRefS5_,
             int32_t, CNWSDialog*, CNWSObject*, CExoLocString*, CResRef*, CResRef*>(&Hooks::GetStartEntryOneLiner);
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__SendDialogEntry,
+        <Functions::_ZN10CNWSDialog15SendDialogEntryEP10CNWSObjectjji,
             int32_t, CNWSDialog*, CNWSObject*, uint32_t, uint32_t, int32_t>(&Hooks::SendDialogEntry);
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__SendDialogReplies,
+        <Functions::_ZN10CNWSDialog17SendDialogRepliesEP10CNWSObjectj,
             int32_t, CNWSDialog*, CNWSObject*, uint32_t>(&Hooks::SendDialogReplies);
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__HandleReply,
+        <Functions::_ZN10CNWSDialog11HandleReplyEjP10CNWSObjectjij,
             int32_t, CNWSDialog*, uint32_t , CNWSObject*, uint32_t, int32_t, uint32_t>(&Hooks::HandleReply);
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__CheckScript,
+        <Functions::_ZN10CNWSDialog11CheckScriptEP10CNWSObjectRK7CResRef,
         int32_t, CNWSDialog *, CNWSObject*, const CResRef*>(&Hooks::CheckScript);
     GetServices()->m_hooks->RequestSharedHook
-        <Functions::CNWSDialog__RunScript,
+        <Functions::_ZN10CNWSDialog9RunScriptEP10CNWSObjectRK7CResRef,
         void, CNWSDialog *, CNWSObject*, const CResRef*>(&Hooks::RunScript);
 }
 
@@ -361,6 +364,19 @@ ArgumentStack Dialog::SetCurrentNodeText(ArgumentStack&& args)
     return stack;
 }
 
+ArgumentStack Dialog::End(ArgumentStack&& args)
+{
+    ArgumentStack stack;
 
+    auto oidObject = Services::Events::ExtractArgument<Types::ObjectID >(args);
+      ASSERT_OR_THROW(oidObject != Constants::OBJECT_INVALID);
+
+    if (auto *pObject = Utils::AsNWSObject(Utils::GetGameObject(oidObject)))
+    {
+        pObject->StopDialog();
+    }
+
+    return stack;
+}
 
 }

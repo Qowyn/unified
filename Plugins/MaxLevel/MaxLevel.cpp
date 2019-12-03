@@ -41,8 +41,7 @@ NWNX_PLUGIN_ENTRY Plugin::Info* PluginInfo()
                     "plenarius@gmail.com",
                     1,
                     true,
-                    0,
-                    8186
+                    0
             };
 }
 
@@ -68,17 +67,18 @@ MaxLevel::MaxLevel(const Plugin::CreateParams& params)
 
     if (m_maxLevel > CORE_MAX_LEVEL)
     {
-        GetServices()->m_hooks->RequestSharedHook<Functions::CServerExoAppInternal__GetServerInfoFromIniFile, void, CServerExoAppInternal *>(&GetServerInfoFromIniFileHook);
-        GetServices()->m_hooks->RequestSharedHook<Functions::CNWRules__ReloadAll, void, CNWRules *>(&ReloadAllHook);
-        GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__CanLevelUp>(&CanLevelUpHook);
-        GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetExpNeededForLevelUp>(&GetExpNeededForLevelUpHook);
-        GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__LevelDown>(&LevelDownHook);
-        m_LevelDownHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCreatureStats__LevelDown);
-        GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreature__SummonAssociate>(&SummonAssociateHook);
-        m_SummonAssociateHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCreature__SummonAssociate);
-        GetServices()->m_hooks->RequestSharedHook<Functions::CNWClass__LoadSpellGainTable, void, CNWClass *, CExoString *>(&LoadSpellGainTableHook);
-        GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWClass__GetSpellGain>(&GetSpellGainHook);
-        GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWClass__GetSpellsKnownPerLevel>( &GetSpellsKnownPerLevelHook);
+        GetServices()->m_hooks->RequestSharedHook<Functions::_ZN21CServerExoAppInternal24GetServerInfoFromIniFileEv, void, CServerExoAppInternal *>(&GetServerInfoFromIniFileHook);
+        GetServices()->m_hooks->RequestSharedHook<Functions::_ZN8CNWRules9ReloadAllEv, void, CNWRules *>(&ReloadAllHook);
+        GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN17CNWSCreatureStats10CanLevelUpEv>(&CanLevelUpHook);
+        GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN17CNWSCreatureStats22GetExpNeededForLevelUpEv>(&GetExpNeededForLevelUpHook);
+        GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN17CNWSCreatureStats9LevelDownEP13CNWLevelStats>(&LevelDownHook);
+        m_LevelDownHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN17CNWSCreatureStats9LevelDownEP13CNWLevelStats);
+        GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN12CNWSCreature15SummonAssociateE7CResRef10CExoStringt>(&SummonAssociateHook);
+        m_SummonAssociateHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN12CNWSCreature15SummonAssociateE7CResRef10CExoStringt);
+        GetServices()->m_hooks->RequestSharedHook<Functions::_ZN8CNWClass18LoadSpellGainTableE10CExoString, void, CNWClass *, CExoString *>(&LoadSpellGainTableHook);
+        GetServices()->m_hooks->RequestSharedHook<Functions::_ZN8CNWClass19LoadSpellKnownTableE10CExoString, void, CNWClass *, CExoString *>(&LoadSpellKnownTableHook);
+        GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN8CNWClass12GetSpellGainEhh>(&GetSpellGainHook);
+        GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN8CNWClass22GetSpellsKnownPerLevelEhhhth>( &GetSpellsKnownPerLevelHook);
     }
 }
 
@@ -194,7 +194,7 @@ void MaxLevel::SummonAssociateHook(CNWSCreature *pCreature, CResRef cResRef, CEx
 {
     auto cUsedResRef = cResRef;
     std::string sResRef = cResRef.GetResRef();
-    if (!Globals::ExoResMan()->Exists(cResRef, 2027, nullptr))
+    if (!Globals::ExoResMan()->Exists(cResRef, Constants::ResRefType::UTC, nullptr))
     {
         std::regex re("(.*)[4-9][0-9]");
         std::string sNewResRef = std::regex_replace(sResRef,re,"$0140");
@@ -209,21 +209,21 @@ void MaxLevel::LoadSpellGainTableHook(Services::Hooks::CallType type, CNWClass* 
     if (type == Services::Hooks::CallType::BEFORE_ORIGINAL)
         return;
 
-    auto *twoda = new C2DA(CResRef(pTable->CStr()), 1);
-    twoda->Load2DArray();
+    C2DA twoda(pTable->CStr(), true);
+    twoda.Load2DArray();
 
     for (int i = CORE_MAX_LEVEL; i < g_plugin->m_maxLevel; i++)
     {
         int32_t numSpellLevels = 0;
         uint8_t lastFoundSpellGainLevel = CORE_MAX_LEVEL;
-        twoda->GetINTEntry(i, "NumSpellLevels", &numSpellLevels);
+        twoda.GetINTEntry(i, "NumSpellLevels", &numSpellLevels);
 
         // If they don't have this set then default to the last found level
         if (!numSpellLevels)
         {
             LOG_WARNING("No spell gain row found for Level %d for %s Class. Defaulting to Level %d.",
                     1 + i, pClass->GetNameText(), lastFoundSpellGainLevel);
-            twoda->GetINTEntry(lastFoundSpellGainLevel - 1, "NumSpellLevels", &numSpellLevels);
+            twoda.GetINTEntry(lastFoundSpellGainLevel - 1, "NumSpellLevels", &numSpellLevels);
         }
         g_plugin->m_nSpellLevelsPerLevelAdded[pClass->m_nName][i] = numSpellLevels;
 
@@ -231,10 +231,10 @@ void MaxLevel::LoadSpellGainTableHook(Services::Hooks::CallType type, CNWClass* 
         for (int j = 0; j < numSpellLevels; j++)
         {
             int32_t iNumSpells = 0;
-            twoda->GetINTEntry(i, 2 + j, &iNumSpells);
+            twoda.GetINTEntry(i, 2 + j, &iNumSpells);
             if (!iNumSpells)
             {
-                twoda->GetINTEntry(lastFoundSpellGainLevel - 1, 2 + j, &iNumSpells);
+                twoda.GetINTEntry(lastFoundSpellGainLevel - 1, 2 + j, &iNumSpells);
             }
             else
             {
@@ -268,25 +268,72 @@ uint8_t MaxLevel::GetSpellGainHook(CNWClass *pClass, uint8_t nLevel, uint8_t nSp
     return result;
 }
 
-// If the player is at level 40 or lower we get the spell gain for that class from the normal array,
+// After the server loads 1-40 we populate our map with the values for 41+
+void MaxLevel::LoadSpellKnownTableHook(Services::Hooks::CallType type, CNWClass* pClass, CExoString *pTable)
+{
+    if (type == Services::Hooks::CallType::BEFORE_ORIGINAL)
+        return;
+
+    C2DA twoda(pTable->CStr(), true);
+    twoda.Load2DArray();
+
+    for (int i = CORE_MAX_LEVEL; i < g_plugin->m_maxLevel; i++)
+    {
+        uint8_t lastFoundSpellKnownLevel = CORE_MAX_LEVEL;
+
+        // Now find the spells known per level for each spell level
+        for (int j = 0; j < g_plugin->m_nSpellLevelsPerLevelAdded[pClass->m_nName][i]; j++)
+        {
+            int32_t iNumSpells = 0;
+            twoda.GetINTEntry(i, 1 + j, &iNumSpells);
+            if (!iNumSpells)
+            {
+                twoda.GetINTEntry(lastFoundSpellKnownLevel - 1, 1 + j, &iNumSpells);
+            }
+            else
+            {
+                lastFoundSpellKnownLevel = 1 + i;
+            }
+            g_plugin->m_nSpellKnownTableAdded[pClass->m_nName][i][j] = iNumSpells;
+        }
+    }
+}
+
+// If the player is at level 40 or lower we get the spell known for that class from the normal array,
 // otherwise we use our map
 uint8_t MaxLevel::GetSpellsKnownPerLevelHook(CNWClass *pClass, uint8_t nLevel, uint8_t nSpellLevel, uint8_t nClass,
                                              uint16_t nRace, uint8_t nCHABase)
 {
     uint8_t result = 0;
-    if (((nLevel <= CORE_MAX_LEVEL && nSpellLevel < pClass->m_lstSpellLevelsPerLevel[nLevel - 1]) ||
-         (nSpellLevel < g_plugin->m_nSpellLevelsPerLevelAdded[pClass->m_nName][nLevel - 1])) &&
-        (nClass != API::Constants::ClassType::Bard ||
-         Globals::Rules()->m_lstRaces[nRace].m_nCHAAdjust + nCHABase > nSpellLevel + 10))
+    uint8_t spellLevelsPerLevel = 0;
+    uint8_t spellsKnownPerSpellLevel = 0;
+    uint8_t spellsKnownPreviousSpellLevel = 0;
+
+    if (pClass->m_lstSpellKnownTable)
     {
         if (nLevel <= CORE_MAX_LEVEL)
         {
-            result = pClass->m_lstSpellLevelsPerLevel[nLevel - 1];
+            spellLevelsPerLevel = pClass->m_lstSpellLevelsPerLevel[nLevel - 1];
+            spellsKnownPerSpellLevel = pClass->m_lstSpellKnownTable[nLevel - 1][nSpellLevel];
+            spellsKnownPreviousSpellLevel = pClass->m_lstSpellKnownTable[nLevel - 1][nSpellLevel - 1];
         }
         else
         {
-            result = g_plugin->m_nSpellLevelsPerLevelAdded[pClass->m_nName][nLevel - 1];
+            spellLevelsPerLevel = g_plugin->m_nSpellLevelsPerLevelAdded[pClass->m_nName][nLevel - 1];
+            spellsKnownPerSpellLevel = g_plugin->m_nSpellKnownTableAdded[pClass->m_nName][nLevel - 1][nSpellLevel];
+            if (nLevel == CORE_MAX_LEVEL + 1)
+                spellsKnownPreviousSpellLevel = pClass->m_lstSpellKnownTable[CORE_MAX_LEVEL][nSpellLevel - 1];
+            else
+                spellsKnownPreviousSpellLevel = g_plugin->m_nSpellKnownTableAdded[pClass->m_nName][nLevel - 1][nSpellLevel - 1];
         }
+    }
+
+    if (nSpellLevel < spellLevelsPerLevel
+        && (nClass != API::Constants::ClassType::Bard
+            || spellsKnownPreviousSpellLevel
+            || Globals::Rules()->m_lstRaces[nRace].m_nCHAAdjust + nCHABase > nSpellLevel + 10))
+    {
+        result = spellsKnownPerSpellLevel;
     }
     return result;
 }

@@ -30,6 +30,7 @@
 #include "Services/Config/Config.hpp"
 #include "Services/Messaging/Messaging.hpp"
 #include "ViewPtr.hpp"
+
 #include <algorithm>
 #include <regex>
 #include <string>
@@ -67,17 +68,22 @@ Events::Events(const Plugin::CreateParams& params)
     if (g_plugin == nullptr) // :(
         g_plugin = this;
 
-    // TODO-64bit: Bring this stuff more in line with how the other plugins handle this
-    GetServices()->m_events->RegisterEvent("SUBSCRIBE_EVENT", std::bind(&Events::OnSubscribeEvent, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("PUSH_EVENT_DATA", std::bind(&Events::OnPushEventData, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("SIGNAL_EVENT", std::bind(&Events::OnSignalEvent, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("GET_EVENT_DATA", std::bind(&Events::OnGetEventData, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("SKIP_EVENT", std::bind(&Events::OnSkipEvent, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("EVENT_RESULT", std::bind(&Events::OnEventResult, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("GET_CURRENT_EVENT", std::bind(&Events::OnGetCurrentEvent, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("ToggleDispatchListMode", std::bind(&Events::ToggleDispatchListMode, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("AddObjectToDispatchList", std::bind(&Events::AddObjectToDispatchList, this, std::placeholders::_1));
-    GetServices()->m_events->RegisterEvent("RemoveObjectFromDispatchList", std::bind(&Events::RemoveObjectFromDispatchList, this, std::placeholders::_1));
+#define REGISTER(func) \
+    GetServices()->m_events->RegisterEvent(#func, \
+        [this](ArgumentStack&& args){ return func(std::move(args)); })
+
+    REGISTER(OnSubscribeEvent);
+    REGISTER(OnPushEventData);
+    REGISTER(OnSignalEvent);
+    REGISTER(OnGetEventData);
+    REGISTER(OnSkipEvent);
+    REGISTER(OnSetEventResult);
+    REGISTER(OnGetCurrentEvent);
+    REGISTER(OnToggleDispatchListMode);
+    REGISTER(OnAddObjectToDispatchList);
+    REGISTER(OnRemoveObjectFromDispatchList);
+
+#undef REGISTER
 
     GetServices()->m_messaging->SubscribeMessage("NWNX_EVENT_SIGNAL_EVENT",
         [](const std::vector<std::string> message)
@@ -125,7 +131,7 @@ Events::~Events()
 
 void Events::PushEventData(const std::string tag, const std::string data)
 {
-    LOG_DEBUG("Pushing event data: '%s' -> '%s'.", tag.c_str(), data.c_str());
+    LOG_DEBUG("Pushing event data: '%s' -> '%s'.", tag, data);
     g_plugin->CreateNewEventDataIfNeeded();
     g_plugin->m_eventData.top().m_EventDataMap[tag] = std::move(data);
 }
@@ -149,7 +155,7 @@ std::string Events::GetEventData(const std::string tag)
     }
 
     retVal=data->second;
-    LOG_DEBUG("Getting event data: '%s' -> '%s'.", tag.c_str(), retVal.c_str());
+    LOG_DEBUG("Getting event data: '%s' -> '%s'.", tag, retVal);
     return retVal;
 }
 
@@ -164,8 +170,8 @@ bool Events::SignalEvent(const std::string& eventName, const Types::ObjectID tar
     for (const auto& script : g_plugin->m_eventMap[eventName])
     {
         auto DispatchEvent = [&]() -> void {
-            LOG_DEBUG("Dispatching notification for event '%s' to script '%s'.", eventName.c_str(), script.c_str());
-            API::CExoString scriptExoStr = script.c_str();
+            LOG_DEBUG("Dispatching notification for event '%s' to script '%s'.", eventName, script);
+            CExoString scriptExoStr = script.c_str();
 
             ++g_plugin->m_eventDepth;
             API::Globals::VirtualMachine()->RunScript(&scriptExoStr, target, 1);
@@ -194,10 +200,10 @@ bool Events::SignalEvent(const std::string& eventName, const Types::ObjectID tar
         }
     }
 
-    g_plugin->m_eventData.pop();
-
-    g_plugin->GetServices()->m_messaging->BroadcastMessage("NWNX_EVENT_SIGNAL_EVENT_RESULT",  { eventName, result ? *result : ""});
+    g_plugin->GetServices()->m_messaging->BroadcastMessage("NWNX_EVENT_SIGNAL_EVENT_RESULT",  { eventName, g_plugin->m_eventData.top().m_Result});
     g_plugin->GetServices()->m_messaging->BroadcastMessage("NWNX_EVENT_SIGNAL_EVENT_SKIPPED", { eventName, skipped ? "1" : "0"});
+
+    g_plugin->m_eventData.pop();
 
     return !skipped;
 }
@@ -215,16 +221,16 @@ void Events::RunEventInit(const std::string& eventName)
         if (std::regex_search(eventName, std::regex(it.first)))
         {
             LOG_DEBUG("Running init function for events '%s' (requested by event '%s')",
-                        it.first.c_str(), eventName.c_str());
+                        it.first, eventName);
             it.second();
             erase.push_back(it.first);
         }
     }
+
     for (auto e: erase)
     {
         m_initList.erase(e);
     }
-
 }
 
 ArgumentStack Events::OnSubscribeEvent(ArgumentStack&& args)
@@ -240,7 +246,7 @@ ArgumentStack Events::OnSubscribeEvent(ArgumentStack&& args)
         throw std::runtime_error("Attempted to subscribe to an event with a script that already subscribed!");
     }
 
-    LOG_INFO("Script '%s' subscribed to event '%s'.", script.c_str(), event.c_str());
+    LOG_INFO("Script '%s' subscribed to event '%s'.", script, event);
     eventVector.emplace_back(std::move(script));
 
     return ArgumentStack();
@@ -285,17 +291,17 @@ ArgumentStack Events::OnSkipEvent(ArgumentStack&&)
     return ArgumentStack();
 }
 
-ArgumentStack Events::OnEventResult(ArgumentStack&& args)
+ArgumentStack Events::OnSetEventResult(ArgumentStack&& args)
 {
     if (m_eventDepth == 0 || m_eventData.empty())
     {
-        throw std::runtime_error("Attempted to skip event in an invalid context.");
+        throw std::runtime_error("Attempted to set event result in an invalid context.");
     }
     const auto data = Services::Events::ExtractArgument<std::string>(args);
 
     m_eventData.top().m_Result = data;
 
-    LOG_DEBUG("Received event result '%s'.", data.c_str());
+    LOG_DEBUG("Received event result '%s'.", data);
 
     return ArgumentStack();
 }
@@ -318,7 +324,7 @@ ArgumentStack Events::OnGetCurrentEvent(ArgumentStack&&)
     return stack;
 }
 
-ArgumentStack Events::ToggleDispatchListMode(ArgumentStack&& args)
+ArgumentStack Events::OnToggleDispatchListMode(ArgumentStack&& args)
 {
     ArgumentStack stack;
 
@@ -336,7 +342,7 @@ ArgumentStack Events::ToggleDispatchListMode(ArgumentStack&& args)
     return stack;
 }
 
-ArgumentStack Events::AddObjectToDispatchList(ArgumentStack&& args)
+ArgumentStack Events::OnAddObjectToDispatchList(ArgumentStack&& args)
 {
     ArgumentStack stack;
 
@@ -356,7 +362,7 @@ ArgumentStack Events::AddObjectToDispatchList(ArgumentStack&& args)
     return stack;
 }
 
-ArgumentStack Events::RemoveObjectFromDispatchList(ArgumentStack&& args)
+ArgumentStack Events::OnRemoveObjectFromDispatchList(ArgumentStack&& args)
 {
     ArgumentStack stack;
 
