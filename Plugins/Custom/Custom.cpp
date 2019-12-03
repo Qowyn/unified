@@ -755,15 +755,18 @@ uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDie(NWNXLib::API::CNWSCreatur
 
 int32_t Custom::CNWSMessage__SendServerToPlayerParty_List(CNWSMessage* pMessage, uint32_t nPlayerID, int32_t nMemberCount, uint32_t* pMembers, uint8_t unk1, uint32_t unk2)
 {
-    if (auto *pClient = static_cast<CNWSPlayer*>(Globals::AppManager()->m_pServerExoApp->GetClientObjectByPlayerId(nPlayerID, 0)))
+    auto *pServer = Globals::AppManager()->m_pServerExoApp;
+    if (auto *pClient = static_cast<CNWSPlayer*>(pServer->GetClientObjectByPlayerId(nPlayerID, 0)))
     {
-        if (pClient->m_nCharacterType != CharacterType::DM)
+        if (pClient->m_nCharacterType != CharacterType::DM && pClient->m_oidNWSObject != pClient->m_oidPCObject)
         {
-            if (auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pClient->m_oidNWSObject))
+            auto *pCreature = pServer->GetCreatureByGameObjectID(pClient->m_oidNWSObject);
+            auto *pPC = pServer->GetCreatureByGameObjectID(pClient->m_oidPCObject);
+            if (pCreature && pPC && pCreature->m_nAssociateType == 7 && pCreature->m_pStats->m_nFactionId != pPC->m_pStats->m_nFactionId && pServer->m_pcExoAppInternal->m_pFactionManager->GetIsNPCFaction(pCreature->m_pStats->m_nFactionId))
             {
-                if (pCreature->m_nAssociateType == 7)
+                if (auto *pFaction = pPC->GetFaction())
                 {
-                    nMemberCount = 0;
+                    return m_CNWSMessage__SendServerToPlayerParty_ListHook->CallOriginal<int32_t>(pMessage, nPlayerID, pFaction->m_listFactionMembers.num, pFaction->m_listFactionMembers.element, unk1, unk2);
                 }
             }
         }
@@ -773,14 +776,18 @@ int32_t Custom::CNWSMessage__SendServerToPlayerParty_List(CNWSMessage* pMessage,
 
 int32_t Custom::CNWSMessage__WriteGameObjUpdate_PartyAIState(CNWSMessage* pMessage, CNWSPlayer* pClient)
 {
-    if (pClient->m_nCharacterType != CharacterType::DM)
+    if (pClient->m_nCharacterType != CharacterType::DM && pClient->m_oidNWSObject != pClient->m_oidPCObject)
     {
-        if (auto *pCreature = Globals::AppManager()->m_pServerExoApp->GetCreatureByGameObjectID(pClient->m_oidNWSObject))
+        auto *pServer = Globals::AppManager()->m_pServerExoApp;
+        auto *pCreature = pServer->GetCreatureByGameObjectID(pClient->m_oidNWSObject);
+        auto *pPC = pServer->GetCreatureByGameObjectID(pClient->m_oidPCObject);
+        if (pCreature && pPC && pCreature->m_nAssociateType == 7 && pCreature->m_pStats->m_nFactionId != pPC->m_pStats->m_nFactionId && pServer->m_pcExoAppInternal->m_pFactionManager->GetIsNPCFaction(pCreature->m_pStats->m_nFactionId))
         {
-            if (pCreature->m_nAssociateType == 7)
-            {
-                return 1;
-            }
+            auto oldFactionId = pCreature->m_pStats->m_nFactionId;
+            pCreature->m_pStats->m_nFactionId = pPC->m_pStats->m_nFactionId;
+            auto result = m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook->CallOriginal<int32_t>(pMessage, pClient);
+            pCreature->m_pStats->m_nFactionId = oldFactionId;
+            return result;
         }
     }
     return m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook->CallOriginal<int32_t>(pMessage, pClient);
