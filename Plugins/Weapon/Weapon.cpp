@@ -9,6 +9,7 @@
 #include "API/CNWBaseItemArray.hpp"
 #include "API/CNWBaseItem.hpp"
 #include "API/CNWRules.hpp"
+#include "API/CServerExoApp.hpp"
 #include "Utils.hpp"
 #include "Services/Messaging/Messaging.hpp"
 

@@ -142,7 +142,7 @@ void Chat::SendServerToPlayerChatMessage(CNWSMessage* thisPtr, Constants::ChatCh
 
                     for (auto *head = playerList->pHead; head; head = head->pNext)
                     {
-                        auto *listener = static_cast<API::CNWSPlayer*>(head->pObject);
+                        auto *listener = static_cast<CNWSPlayer*>(head->pObject);
                         auto *listenerObj = Utils::AsNWSObject(listener->GetGameObject());
 
                         if (listenerObj && speakerArea == listenerObj->GetArea())

@@ -2,8 +2,6 @@
 #include "API/CAppManager.hpp"
 #include "API/CExoLinkedListInternal.hpp"
 #include "API/CExoLinkedListNode.hpp"
-#include "API/CExoLinkedListTemplatedCNWSClient.hpp"
-#include "API/CExoLinkedListTemplatedlongunsignedint.hpp"
 #include "API/CFactionManager.hpp"
 #include "API/CGameObjectArray.hpp"
 #include "API/CGameObjectArrayNode.hpp"
@@ -77,29 +75,32 @@ Custom::Custom(const Plugin::CreateParams& params)
     REGISTER(SetFactionId);
     REGISTER(GetFactionName);
 #undef REGISTER
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCombatRound__InitializeNumberOfAttacks>(&InitializeNumberOfAttacks);
-    m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCombatRound__InitializeNumberOfAttacks);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetFavoredEnemyBonus>(&GetFavoredEnemyBonus);
-    m_GetFavoredEnemyBonusHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSCreatureStats__GetFavoredEnemyBonus);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSEffectListHandler__OnApplyTimestop>(&CNWSEffectListHandler__OnApplyTimestop);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSEffectListHandler__OnRemoveTimestop>(&CNWSEffectListHandler__OnRemoveTimestop);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSObject__SetArea>(&CNWSObject__SetArea);
-    m_SetAreaHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSObject__SetArea);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__SendServerToPlayerModule_SetPauseState>(&CNWSMessage__SendServerToPlayerModule_SetPauseState);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoAppInternal__IsOnActiveExclusionList>(&CServerExoAppInternal__IsOnActiveExclusionList);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoAppInternal__IsOnExclusionList>(&CServerExoAppInternal__IsOnActiveExclusionList);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__HandlePlayerToServerInputMessage>(&CNWSMessage__HandlePlayerToServerInputMessage);
-    m_HandlePlayerToServerInputMessageHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSMessage__HandlePlayerToServerInputMessage);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetUnarmedDamageDice>(&CNWSCreatureStats__GetUnarmedDamageDice);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSCreatureStats__GetUnarmedDamageDie>(&CNWSCreatureStats__GetUnarmedDamageDie);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__SendServerToPlayerParty_List>(&CNWSMessage__SendServerToPlayerParty_List);
-    m_CNWSMessage__SendServerToPlayerParty_ListHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSMessage__SendServerToPlayerParty_List);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CNWSMessage__WriteGameObjUpdate_PartyAIState>(&CNWSMessage__WriteGameObjUpdate_PartyAIState);
-    m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook = GetServices()->m_hooks->FindHookByAddress(Functions::CNWSMessage__WriteGameObjUpdate_PartyAIState);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CWorldTimer__PauseWorldTimer>(&CWorldTimer__PauseWorldTimer);
-    m_CWorldTimer__PauseWorldTimerHook = GetServices()->m_hooks->FindHookByAddress(Functions::CWorldTimer__PauseWorldTimer);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CWorldTimer__UnpauseWorldTimer>(&CWorldTimer__UnpauseWorldTimer);
-    GetServices()->m_hooks->RequestSharedHook<API::Functions::CServerExoAppInternal__MainLoop, int32_t>(
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv>(&InitializeNumberOfAttacks);
+    m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN17CNWSCreatureStats20GetFavoredEnemyBonusEP12CNWSCreature>(&GetFavoredEnemyBonus);
+    m_GetFavoredEnemyBonusHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN17CNWSCreatureStats20GetFavoredEnemyBonusEP12CNWSCreature);
+    /*
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN21CNWSEffectListHandler15OnApplyTimestopEP10CNWSObjectP11CGameEffecti>(&CNWSEffectListHandler__OnApplyTimestop);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN21CNWSEffectListHandler16OnRemoveTimestopEP10CNWSObjectP11CGameEffect>(&CNWSEffectListHandler__OnRemoveTimestop);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN10CNWSObject7SetAreaEP8CNWSArea>(&CNWSObject__SetArea);
+    m_SetAreaHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN10CNWSObject7SetAreaEP8CNWSArea);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CNWSMessage38SendServerToPlayerModule_SetPauseStateEhi>(&CNWSMessage__SendServerToPlayerModule_SetPauseState);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN21CServerExoAppInternal23IsOnActiveExclusionListEj>(&CServerExoAppInternal__IsOnActiveExclusionList);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN21CServerExoAppInternal17IsOnExclusionListEj>(&CServerExoAppInternal__IsOnActiveExclusionList);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CNWSMessage32HandlePlayerToServerInputMessageEP10CNWSPlayerh>(&CNWSMessage__HandlePlayerToServerInputMessage);
+    m_HandlePlayerToServerInputMessageHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN11CNWSMessage32HandlePlayerToServerInputMessageEP10CNWSPlayerh);
+    */
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN17CNWSCreatureStats20GetUnarmedDamageDiceEv>(&CNWSCreatureStats__GetUnarmedDamageDice);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN17CNWSCreatureStats19GetUnarmedDamageDieEv>(&CNWSCreatureStats__GetUnarmedDamageDie);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CNWSMessage28SendServerToPlayerParty_ListEjiPjhj>(&CNWSMessage__SendServerToPlayerParty_List);
+    m_CNWSMessage__SendServerToPlayerParty_ListHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN11CNWSMessage28SendServerToPlayerParty_ListEjiPjhj);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CNWSMessage31WriteGameObjUpdate_PartyAIStateEP10CNWSPlayer>(&CNWSMessage__WriteGameObjUpdate_PartyAIState);
+    m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN11CNWSMessage31WriteGameObjUpdate_PartyAIStateEP10CNWSPlayer);
+    /*
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CWorldTimer15PauseWorldTimerEv>(&CWorldTimer__PauseWorldTimer);
+    m_CWorldTimer__PauseWorldTimerHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN11CWorldTimer15PauseWorldTimerEv);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CWorldTimer17UnpauseWorldTimerEv>(&CWorldTimer__UnpauseWorldTimer);
+    GetServices()->m_hooks->RequestSharedHook<API::Functions::_ZN13CServerExoApp8MainLoopEv, int32_t>(
             +[](Services::Hooks::CallType type, CServerExoAppInternal* pInternal)
             {
                 if (type == Services::Hooks::CallType::BEFORE_ORIGINAL)
@@ -110,8 +111,9 @@ Custom::Custom(const Plugin::CreateParams& params)
                     }
                 }
             });
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoApp__GetActivePauseState>(&CServerExoApp__GetActivePauseState);
-    GetServices()->m_hooks->RequestExclusiveHook<Functions::CServerExoAppInternal__GetActiveTimer>(&CServerExoAppInternal__GetActiveTimer);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN13CServerExoApp19GetActivePauseStateEv>(&CServerExoApp__GetActivePauseState);
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN21CServerExoAppInternal14GetActiveTimerEj>(&CServerExoAppInternal__GetActiveTimer);
+    */
 }
 
 Custom::~Custom()
@@ -278,7 +280,7 @@ int32_t Custom::GetFavoredEnemyBonus(CNWSCreatureStats* pStats, CNWSCreature* pO
     return m_GetFavoredEnemyBonusHook->CallOriginal<int32_t>(pStats, pOtherCreature) * 2;
 }
 
-int Custom::GetLevelByClass(NWNXLib::API::CNWSCreatureStats *pStats, uint32_t nClassType)
+int Custom::GetLevelByClass(CNWSCreatureStats *pStats, uint32_t nClassType)
 {
     for (int i = 0; i < pStats->m_nNumMultiClasses; i++)
     {
@@ -289,7 +291,7 @@ int Custom::GetLevelByClass(NWNXLib::API::CNWSCreatureStats *pStats, uint32_t nC
     return 0;
 }
 
-int32_t Custom::CNWSEffectListHandler__OnApplyTimestop(NWNXLib::API::CNWSEffectListHandler*, NWNXLib::API::CNWSObject *pObj, NWNXLib::API::CGameEffect*, int32_t)
+int32_t Custom::CNWSEffectListHandler__OnApplyTimestop(CNWSEffectListHandler*, CNWSObject *pObj, CGameEffect*, int32_t)
 {
     if (pObj->m_oidArea != OBJECT_INVALID)
     {
@@ -316,7 +318,7 @@ int32_t Custom::CNWSEffectListHandler__OnApplyTimestop(NWNXLib::API::CNWSEffectL
     return 0;
 }
 
-int32_t Custom::CNWSEffectListHandler__OnRemoveTimestop(NWNXLib::API::CNWSEffectListHandler*, NWNXLib::API::CNWSObject *pObj, NWNXLib::API::CGameEffect*)
+int32_t Custom::CNWSEffectListHandler__OnRemoveTimestop(CNWSEffectListHandler*, CNWSObject *pObj, CGameEffect*)
 {
     if (pObj->m_oidArea != OBJECT_INVALID)
     {
@@ -350,7 +352,7 @@ int32_t Custom::CNWSEffectListHandler__OnRemoveTimestop(NWNXLib::API::CNWSEffect
     return 1;
 }
 
-void Custom::CNWSObject__SetArea(NWNXLib::API::CNWSObject* pObj, NWNXLib::API::CNWSArea* pArea)
+void Custom::CNWSObject__SetArea(CNWSObject* pObj, CNWSArea* pArea)
 {
     Types::ObjectID oldAreaId = pObj->m_oidArea;
     Types::ObjectID newAreaId = pArea ? pArea->m_idSelf : OBJECT_INVALID;
@@ -363,7 +365,7 @@ void Custom::CNWSObject__SetArea(NWNXLib::API::CNWSObject* pObj, NWNXLib::API::C
     }
 }
 
-void Custom::CNWSObject__SetAreaPost(NWNXLib::API::CNWSObject* pObj, uint32_t oldAreaId, uint32_t newAreaId)
+void Custom::CNWSObject__SetAreaPost(CNWSObject* pObj, uint32_t oldAreaId, uint32_t newAreaId)
 {
     if (!Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal->m_nPauseState) return;
 
@@ -438,7 +440,7 @@ void Custom::CNWSObject__SetAreaPost(NWNXLib::API::CNWSObject* pObj, uint32_t ol
     
 }
 
-int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(NWNXLib::API::CNWSMessage* pMessage, uint8_t nPauseState, int32_t bPaused)
+int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(CNWSMessage* pMessage, uint8_t nPauseState, int32_t bPaused)
 {
     auto *pServer = Globals::AppManager()->m_pServerExoApp->m_pcExoAppInternal;
     auto *pPlayerList = pServer->m_pNWSPlayerList->m_pcExoLinkedListInternal;
@@ -472,11 +474,11 @@ int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(NWNXLib::API
             pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
             pMessage->WriteBYTE(nPauseState, 2);
             pMessage->WriteBOOL(1);
-            auto *pExclusionList = nPauseState == 1 ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
-            pMessage->WriteWORD(pExclusionList->m_nCount, 16);
-            for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+            auto *pExclusionList = nPauseState == 1 ? pServer->m_lstTimestopExclusionList : pServer->m_lstPauseExclusionList;
+            pMessage->WriteWORD(pExclusionList->num, 16);
+            for (int32_t index = 0; index < pExclusionList->num; index++)
             {
-                pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+                pMessage->WriteOBJECTIDServer(pExclusionList->element[index]);
             }
 
             pMessage->GetWriteMessage(&szMessage, &messageSize);
@@ -507,11 +509,11 @@ int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(NWNXLib::API
             pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
             pMessage->WriteBYTE(pServer->m_nPauseState, 2);
             pMessage->WriteBOOL(0);
-            auto *pExclusionList = nPauseState == 2 ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
-            pMessage->WriteWORD(pExclusionList->m_nCount, 16);
-            for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+            auto *pExclusionList = nPauseState == 2 ? pServer->m_lstTimestopExclusionList : pServer->m_lstPauseExclusionList;
+            pMessage->WriteWORD(pExclusionList->num, 16);
+            for (int32_t index = 0; index < pExclusionList->num; index++)
             {
-                pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+                pMessage->WriteOBJECTIDServer(pExclusionList->element[index]);
             }
             pMessage->GetWriteMessage(&szMessage, &messageSize);
 
@@ -545,11 +547,11 @@ int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(NWNXLib::API
         pMessage->CreateWriteMessage(1, 0xFFFFFFFF, 1);
         pMessage->WriteBYTE(nPauseState, 2);
         pMessage->WriteBOOL(0);
-        auto *pExclusionList = nPauseState == 2 ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
-        pMessage->WriteWORD(pExclusionList->m_nCount, 16);
-        for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+        auto *pExclusionList = nPauseState == 2 ? pServer->m_lstTimestopExclusionList : pServer->m_lstPauseExclusionList;
+        pMessage->WriteWORD(pExclusionList->num, 16);
+        for (int32_t index = 0; index < pExclusionList->num; index++)
         {
-            pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+            pMessage->WriteOBJECTIDServer(pExclusionList->element[index]);
         }
         pMessage->GetWriteMessage(&szMessage, &messageSize);
 
@@ -564,7 +566,7 @@ int32_t Custom::CNWSMessage__SendServerToPlayerModule_SetPauseState(NWNXLib::API
     return 1;
 }
 
-void Custom::SendPauseState(NWNXLib::API::CNWSMessage* pMessage, int32_t nPauseState, bool bPaused, uint32_t nPlayerId)
+void Custom::SendPauseState(CNWSMessage* pMessage, int32_t nPauseState, bool bPaused, uint32_t nPlayerId)
 {
     unsigned char* szMessage;
     uint32_t messageSize;
@@ -574,11 +576,11 @@ void Custom::SendPauseState(NWNXLib::API::CNWSMessage* pMessage, int32_t nPauseS
     pMessage->WriteBYTE(nPauseState, 2);
     pMessage->WriteBOOL(bPaused);
 
-    auto *pExclusionList = (nPauseState == 1) == bPaused ? pServer->m_lstTimestopExclusionList->m_pcExoLinkedListInternal : pServer->m_lstPauseExclusionList->m_pcExoLinkedListInternal;
-    pMessage->WriteWORD(pExclusionList->m_nCount, 16);
-    for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+    auto *pExclusionList = (nPauseState == 1) == bPaused ? pServer->m_lstTimestopExclusionList : pServer->m_lstPauseExclusionList;
+    pMessage->WriteWORD(pExclusionList->num, 16);
+    for (int32_t index = 0; index < pExclusionList->num; index++)
     {
-        pMessage->WriteOBJECTIDServer(reinterpret_cast<uint32_t>(pNode->pObject));
+        pMessage->WriteOBJECTIDServer(pExclusionList->element[index]);
     }
 
     pMessage->GetWriteMessage(&szMessage, &messageSize);
@@ -586,7 +588,7 @@ void Custom::SendPauseState(NWNXLib::API::CNWSMessage* pMessage, int32_t nPauseS
     pMessage->SendServerToPlayerMessage(nPlayerId, MessageMajor::Module, MessageModuleMinor::SetPauseState, szMessage, messageSize);
 }
 
-bool Custom::HasTimestop(NWNXLib::API::CNWSObject *pCreature)
+bool Custom::HasTimestop(CNWSObject *pCreature)
 {
     auto pEffects = &pCreature->m_appliedEffects;
     if (!pEffects->element) return false;
@@ -600,7 +602,7 @@ bool Custom::HasTimestop(NWNXLib::API::CNWSObject *pCreature)
     return false;
 }
 
-int32_t Custom::TimestopCount(NWNXLib::API::CNWSObject* pCreature)
+int32_t Custom::TimestopCount(CNWSObject* pCreature)
 {
     auto result = 0;
     auto pEffects = &pCreature->m_appliedEffects;
@@ -615,7 +617,7 @@ int32_t Custom::TimestopCount(NWNXLib::API::CNWSObject* pCreature)
     return result;
 }
 
-bool Custom::IsDM(NWNXLib::API::CNWSCreature *pCreature)
+bool Custom::IsDM(CNWSCreature *pCreature)
 {
     if (!pCreature->m_bPlayerCharacter) return false;
 
@@ -632,17 +634,17 @@ bool Custom::IsDM(NWNXLib::API::CNWSCreature *pCreature)
     return false;
 }
 
-int32_t Custom::CServerExoAppInternal__IsOnActiveExclusionList(NWNXLib::API::CServerExoAppInternal* pInternal, uint32_t nObjectId)
+int32_t Custom::CServerExoAppInternal__IsOnActiveExclusionList(CServerExoAppInternal* pInternal, uint32_t nObjectId)
 {
     if (auto *pGObj = pInternal->GetGameObject(nObjectId))
     {
         if (auto *pObj = Utils::AsNWSObject(pGObj))
         {
-            if (std::find(pauseAreas.begin(), pauseAreas.end(), pObj->m_oidArea) != pauseAreas.end() && !IsOnExclusionList(nObjectId, pInternal->m_lstPauseExclusionList->m_pcExoLinkedListInternal))
+            if (std::find(pauseAreas.begin(), pauseAreas.end(), pObj->m_oidArea) != pauseAreas.end() && !IsOnExclusionList(nObjectId, pInternal->m_lstPauseExclusionList))
             {
                 return 0;
             }
-            if (timeStopAreas.find(pObj->m_oidArea) != timeStopAreas.end() && !IsOnExclusionList(nObjectId, pInternal->m_lstTimestopExclusionList->m_pcExoLinkedListInternal))
+            if (timeStopAreas.find(pObj->m_oidArea) != timeStopAreas.end() && !IsOnExclusionList(nObjectId, pInternal->m_lstTimestopExclusionList))
             {
                 return 0;
             }
@@ -651,7 +653,7 @@ int32_t Custom::CServerExoAppInternal__IsOnActiveExclusionList(NWNXLib::API::CSe
     return 1;
 }
 
-int32_t Custom::CNWSMessage__HandlePlayerToServerInputMessage(NWNXLib::API::CNWSMessage* pMessage, NWNXLib::API::CNWSPlayer* pPlayer, uint8_t nMinor)
+int32_t Custom::CNWSMessage__HandlePlayerToServerInputMessage(CNWSMessage* pMessage, CNWSPlayer* pPlayer, uint8_t nMinor)
 {
     if (nMinor != MessageInputMinor::TogglePauseRequest)
     {
@@ -693,15 +695,15 @@ int32_t Custom::CNWSMessage__HandlePlayerToServerInputMessage(NWNXLib::API::CNWS
     return 0;
 }
 
-void Custom::CWorldTimer__PauseWorldTimer(NWNXLib::API::CWorldTimer*) {}
-void Custom::CWorldTimer__UnpauseWorldTimer(NWNXLib::API::CWorldTimer*) {}
+void Custom::CWorldTimer__PauseWorldTimer(CWorldTimer*) {}
+void Custom::CWorldTimer__UnpauseWorldTimer(CWorldTimer*) {}
 
 uint8_t Custom::CServerExoApp__GetActivePauseState(CServerExoApp*)
 {
     return 0;
 }
 
-uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDice(NWNXLib::API::CNWSCreatureStats* pStats)
+uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDice(CNWSCreatureStats* pStats)
 {
     if (!pStats->m_pBaseCreature->GetUseMonkAbilities())
     {
@@ -721,7 +723,7 @@ uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDice(NWNXLib::API::CNWSCreatu
     }
 }
 
-uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDie(NWNXLib::API::CNWSCreatureStats* pStats)
+uint8_t Custom::CNWSCreatureStats__GetUnarmedDamageDie(CNWSCreatureStats* pStats)
 {
     auto nSize = pStats->m_pBaseCreature->m_nCreatureSize;
     if (!pStats->m_pBaseCreature->GetUseMonkAbilities())
@@ -798,11 +800,11 @@ CWorldTimer* Custom::CServerExoAppInternal__GetActiveTimer(CServerExoAppInternal
     if (pInternal->m_nPauseState == 0) return pInternal->m_pWorldTimer;
     if (auto *pObj = Utils::AsNWSObject(pInternal->GetGameObject(nOID)))
     {
-        if (std::find(pauseAreas.begin(), pauseAreas.end(), pObj->m_oidArea) != pauseAreas.end() && !IsOnExclusionList(nOID, pInternal->m_lstPauseExclusionList->m_pcExoLinkedListInternal))
+        if (std::find(pauseAreas.begin(), pauseAreas.end(), pObj->m_oidArea) != pauseAreas.end() && !IsOnExclusionList(nOID, pInternal->m_lstPauseExclusionList))
         {
             return &areaTimers.at(pObj->m_oidArea);
         }
-        if (timeStopAreas.find(pObj->m_oidArea) != timeStopAreas.end() && !IsOnExclusionList(nOID, pInternal->m_lstTimestopExclusionList->m_pcExoLinkedListInternal))
+        if (timeStopAreas.find(pObj->m_oidArea) != timeStopAreas.end() && !IsOnExclusionList(nOID, pInternal->m_lstTimestopExclusionList))
         {
             return &areaTimers.at(pObj->m_oidArea);
         }
@@ -810,11 +812,11 @@ CWorldTimer* Custom::CServerExoAppInternal__GetActiveTimer(CServerExoAppInternal
     return pInternal->m_pWorldTimer;
 }
 
-bool Custom::IsOnExclusionList(uint32_t nOID, CExoLinkedListInternal* pExclusionList)
+bool Custom::IsOnExclusionList(uint32_t nOID, AurList<OBJECT_ID>* pExclusionList)
 {
-    for (auto *pNode = pExclusionList->pHead; pNode; pNode = pNode->pNext)
+    for (int32_t index = 0; index < pExclusionList->num; index++)
     {
-        if (reinterpret_cast<uint32_t>(pNode->pObject) == nOID) return true;
+        if (pExclusionList->element[index] == nOID) return true;
     }
     return false;
 }

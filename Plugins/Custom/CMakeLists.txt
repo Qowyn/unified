@@ -1,2 +1,2 @@
 add_plugin(Custom
-    Custom.cpp)
+    "Custom.cpp")
