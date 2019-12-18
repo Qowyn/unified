@@ -39,6 +39,8 @@ private:
     ArgumentStack GetFactionId(ArgumentStack&& args);
     ArgumentStack SetFactionId(ArgumentStack&& args);
     ArgumentStack GetFactionName(ArgumentStack&& args);
+    ArgumentStack GetSuppressDialog(ArgumentStack&& args);
+    ArgumentStack SetSuppressDialog(ArgumentStack&& args);
     CNWSPlayer *player(ArgumentStack& args);
     static void InitializeNumberOfAttacks(CNWSCombatRound*);
     static int32_t GetFavoredEnemyBonus(CNWSCreatureStats*, CNWSCreature*);
@@ -65,6 +67,7 @@ private:
     static bool IsOnExclusionList(uint32_t, AurList<OBJECT_ID>*);
     static void InitTimer(uint32_t);
     static void ResetTimer(uint32_t);
+    static int32_t SendServerToPlayerChatMultiLangMessage(CNWSMessage*, uint8_t, OBJECT_ID, CExoLocString, OBJECT_ID, uint8_t, uint32_t *, uint32_t, int32_t, const CResRef &, int32_t, OBJECT_ID);
 };
 
 }

@@ -21,6 +21,7 @@
 #include "Services/Events/Events.hpp"
 #include "Services/Hooks/Hooks.hpp"
 #include "Services/Messaging/Messaging.hpp"
+#include "Services/PerObjectStorage/PerObjectStorage.hpp"
 #include "ViewPtr.hpp"
 #include "Utils.hpp"
 
@@ -58,6 +59,7 @@ static NWNXLib::Hooking::FunctionHook* m_HandlePlayerToServerInputMessageHook;
 static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__SendServerToPlayerParty_ListHook;
 static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook;
 static NWNXLib::Hooking::FunctionHook* m_CWorldTimer__PauseWorldTimerHook;
+static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__SendServerToPlayerChatMultiLangMessageHook;
 static std::unordered_map<Types::ObjectID, std::vector<Types::ObjectID>> timeStopAreas;
 static std::vector<Types::ObjectID> pauseAreas;
 static std::unordered_map<Types::ObjectID, CWorldTimer> areaTimers;
@@ -74,6 +76,8 @@ Custom::Custom(const Plugin::CreateParams& params)
     REGISTER(GetFactionId);
     REGISTER(SetFactionId);
     REGISTER(GetFactionName);
+    REGISTER(GetSuppressDialog);
+    REGISTER(SetSuppressDialog);
 #undef REGISTER
     GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv>(&InitializeNumberOfAttacks);
     m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv);
@@ -114,6 +118,9 @@ Custom::Custom(const Plugin::CreateParams& params)
     GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN13CServerExoApp19GetActivePauseStateEv>(&CServerExoApp__GetActivePauseState);
     GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN21CServerExoAppInternal14GetActiveTimerEj>(&CServerExoAppInternal__GetActiveTimer);
     */
+
+    GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CNWSMessage38SendServerToPlayerChatMultiLangMessageEhj13CExoLocStringjhPjjiRK7CResRefij>(&SendServerToPlayerChatMultiLangMessage);
+    m_CNWSMessage__SendServerToPlayerChatMultiLangMessageHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN11CNWSMessage38SendServerToPlayerChatMultiLangMessageEhj13CExoLocStringjhPjjiRK7CResRefij);
 }
 
 Custom::~Custom()
@@ -238,6 +245,34 @@ ArgumentStack Custom::GetFactionName(ArgumentStack&& args)
     }
 
     Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::GetSuppressDialog(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
+    int32_t retVal = pPOS->Get<int>(nObjectId, "SUPPRESS_DIALOG_LOG").value_or(0);
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::SetSuppressDialog(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+    
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto bValue = Services::Events::ExtractArgument<int32_t>(args);
+
+    if (nObjectId != OBJECT_INVALID)
+    {
+        auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
+        pPOS->Set(nObjectId, "SUPPRESS_DIALOG_LOG", bValue);
+    }
 
     return stack;
 }
@@ -841,6 +876,20 @@ void Custom::ResetTimer(uint32_t nArea)
     {
         areaTimers[nArea].m_bPaused = false;
     }
+}
+
+int32_t Custom::SendServerToPlayerChatMultiLangMessage(CNWSMessage *pMessage, uint8_t nChatMessageType, OBJECT_ID oidSpeaker, CExoLocString sSpeakerMessage, OBJECT_ID oidTokenTarget, uint8_t gender, uint32_t * pPlayerIdNoBubble, uint32_t nPlayerIdNoBubble, int32_t bPrivateChat, const CResRef & sSound, int32_t bPlayHelloSound, OBJECT_ID oidLastSpeaker)
+{
+    auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
+
+    auto bSuppress = pPOS->Get<int>(oidSpeaker, "SUPPRESS_DIALOG_LOG");
+
+    if (bSuppress.value_or(0))
+    {
+        return 0;
+    }
+
+    return m_CNWSMessage__SendServerToPlayerChatMultiLangMessageHook->CallOriginal<int32_t>(pMessage, nChatMessageType, oidSpeaker, sSpeakerMessage, oidTokenTarget, gender, pPlayerIdNoBubble, nPlayerIdNoBubble, bPrivateChat, sSound, bPlayHelloSound, oidLastSpeaker);
 }
 
 }
