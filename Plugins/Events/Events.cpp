@@ -27,9 +27,9 @@
 #include "Events/PVPEvents.hpp"
 #include "Events/InputEvents.hpp"
 #include "Events/MaterialChangeEvents.hpp"
+#include "Events/ObjectEvents.hpp"
 #include "Services/Config/Config.hpp"
 #include "Services/Messaging/Messaging.hpp"
-#include "ViewPtr.hpp"
 
 #include <algorithm>
 #include <regex>
@@ -39,7 +39,7 @@ using namespace NWNXLib;
 using namespace NWNXLib::API;
 using namespace NWNXLib::API::Constants;
 
-static ViewPtr<Events::Events> g_plugin;
+static Events::Events* g_plugin;
 
 NWNX_PLUGIN_ENTRY Plugin::Info* PluginInfo()
 {
@@ -72,16 +72,16 @@ Events::Events(const Plugin::CreateParams& params)
     GetServices()->m_events->RegisterEvent(#func, \
         [this](ArgumentStack&& args){ return func(std::move(args)); })
 
-    REGISTER(OnSubscribeEvent);
-    REGISTER(OnPushEventData);
-    REGISTER(OnSignalEvent);
-    REGISTER(OnGetEventData);
-    REGISTER(OnSkipEvent);
-    REGISTER(OnSetEventResult);
-    REGISTER(OnGetCurrentEvent);
-    REGISTER(OnToggleDispatchListMode);
-    REGISTER(OnAddObjectToDispatchList);
-    REGISTER(OnRemoveObjectFromDispatchList);
+    REGISTER(SubscribeEvent);
+    REGISTER(PushEventData);
+    REGISTER(SignalEvent);
+    REGISTER(GetEventData);
+    REGISTER(SkipEvent);
+    REGISTER(SetEventResult);
+    REGISTER(GetCurrentEvent);
+    REGISTER(ToggleDispatchListMode);
+    REGISTER(AddObjectToDispatchList);
+    REGISTER(RemoveObjectFromDispatchList);
 
 #undef REGISTER
 
@@ -99,30 +99,32 @@ Events::Events(const Plugin::CreateParams& params)
             PushEventData(message[0], message[1]);
         });
 
-    m_associateEvents   = std::make_unique<AssociateEvents>(GetServices()->m_hooks);
-    m_barterEvents      = std::make_unique<BarterEvents>(GetServices()->m_hooks);
-    m_clientEvents      = std::make_unique<ClientEvents>(GetServices()->m_hooks);
-    m_combatEvents      = std::make_unique<CombatEvents>(GetServices()->m_hooks);
-    m_dmActionEvents    = std::make_unique<DMActionEvents>(GetServices()->m_hooks);
-    m_examineEvents     = std::make_unique<ExamineEvents>(GetServices()->m_hooks);
-    m_itemEvents        = std::make_unique<ItemEvents>(GetServices()->m_hooks);
-    m_featEvents        = std::make_unique<FeatEvents>(GetServices()->m_hooks);
-    m_stealthEvents     = std::make_unique<StealthEvents>(GetServices()->m_hooks);
-    m_spellEvents       = std::make_unique<SpellEvents>(GetServices()->m_hooks);
-    m_partyEvents       = std::make_unique<PartyEvents>(GetServices()->m_hooks);
-    m_healerKitEvents   = std::make_unique<HealerKitEvents>(GetServices()->m_hooks);
-    m_skillEvents       = std::make_unique<SkillEvents>(GetServices()->m_hooks);
-    m_mapEvents         = std::make_unique<MapEvents>(GetServices()->m_hooks);
-    m_polymorphEvents   = std::make_unique<PolymorphEvents>(GetServices()->m_hooks);
-    m_effectEvents      = std::make_unique<EffectEvents>(GetServices()->m_hooks);
-    m_quickChatEvents   = std::make_unique<QuickChatEvents>(GetServices()->m_hooks);
-    m_inventoryEvents   = std::make_unique<InventoryEvents>(GetServices()->m_hooks);
-    m_trapEvents        = std::make_unique<TrapEvents>(GetServices()->m_hooks);
-    m_timingBarEvents   = std::make_unique<TimingBarEvents>(GetServices()->m_hooks);
-    m_levelEvents       = std::make_unique<LevelEvents>(GetServices()->m_hooks);
-    m_PVPEvents         = std::make_unique<PVPEvents>(GetServices()->m_hooks);
-    m_inputEvents       = std::make_unique<InputEvents>(GetServices()->m_hooks);
-    m_matChangeEvents   = std::make_unique<MaterialChangeEvents>(GetServices()->m_hooks);
+    auto hooker = GetServices()->m_hooks.get();
+    m_associateEvents   = std::make_unique<AssociateEvents>(hooker);
+    m_barterEvents      = std::make_unique<BarterEvents>(hooker);
+    m_clientEvents      = std::make_unique<ClientEvents>(hooker);
+    m_combatEvents      = std::make_unique<CombatEvents>(hooker);
+    m_dmActionEvents    = std::make_unique<DMActionEvents>(hooker);
+    m_examineEvents     = std::make_unique<ExamineEvents>(hooker);
+    m_itemEvents        = std::make_unique<ItemEvents>(hooker);
+    m_featEvents        = std::make_unique<FeatEvents>(hooker);
+    m_stealthEvents     = std::make_unique<StealthEvents>(hooker);
+    m_spellEvents       = std::make_unique<SpellEvents>(hooker);
+    m_partyEvents       = std::make_unique<PartyEvents>(hooker);
+    m_healerKitEvents   = std::make_unique<HealerKitEvents>(hooker);
+    m_skillEvents       = std::make_unique<SkillEvents>(hooker);
+    m_mapEvents         = std::make_unique<MapEvents>(hooker);
+    m_polymorphEvents   = std::make_unique<PolymorphEvents>(hooker);
+    m_effectEvents      = std::make_unique<EffectEvents>(hooker);
+    m_quickChatEvents   = std::make_unique<QuickChatEvents>(hooker);
+    m_inventoryEvents   = std::make_unique<InventoryEvents>(hooker);
+    m_trapEvents        = std::make_unique<TrapEvents>(hooker);
+    m_timingBarEvents   = std::make_unique<TimingBarEvents>(hooker);
+    m_levelEvents       = std::make_unique<LevelEvents>(hooker);
+    m_PVPEvents         = std::make_unique<PVPEvents>(hooker);
+    m_inputEvents       = std::make_unique<InputEvents>(hooker);
+    m_matChangeEvents   = std::make_unique<MaterialChangeEvents>(hooker);
+    m_objectEvents      = std::make_unique<ObjectEvents>(hooker);
 }
 
 Events::~Events()
@@ -233,7 +235,7 @@ void Events::RunEventInit(const std::string& eventName)
     }
 }
 
-ArgumentStack Events::OnSubscribeEvent(ArgumentStack&& args)
+ArgumentStack Events::SubscribeEvent(ArgumentStack&& args)
 {
     const auto event = Services::Events::ExtractArgument<std::string>(args);
     auto script = Services::Events::ExtractArgument<std::string>(args);
@@ -252,7 +254,7 @@ ArgumentStack Events::OnSubscribeEvent(ArgumentStack&& args)
     return ArgumentStack();
 }
 
-ArgumentStack Events::OnPushEventData(ArgumentStack&& args)
+ArgumentStack Events::PushEventData(ArgumentStack&& args)
 {
     const auto tag = Services::Events::ExtractArgument<std::string>(args);
     const auto data = Services::Events::ExtractArgument<std::string>(args);
@@ -260,7 +262,7 @@ ArgumentStack Events::OnPushEventData(ArgumentStack&& args)
     return ArgumentStack();
 }
 
-ArgumentStack Events::OnSignalEvent(ArgumentStack&& args)
+ArgumentStack Events::SignalEvent(ArgumentStack&& args)
 {
     const auto event = Services::Events::ExtractArgument<std::string>(args);
     const auto object = Services::Events::ExtractArgument<Types::ObjectID>(args);
@@ -270,7 +272,7 @@ ArgumentStack Events::OnSignalEvent(ArgumentStack&& args)
     return stack;
 }
 
-ArgumentStack Events::OnGetEventData(ArgumentStack&& args)
+ArgumentStack Events::GetEventData(ArgumentStack&& args)
 {
     std::string data = GetEventData(Services::Events::ExtractArgument<std::string>(args));
     ArgumentStack stack;
@@ -278,7 +280,7 @@ ArgumentStack Events::OnGetEventData(ArgumentStack&& args)
     return stack;
 }
 
-ArgumentStack Events::OnSkipEvent(ArgumentStack&&)
+ArgumentStack Events::SkipEvent(ArgumentStack&&)
 {
     if (m_eventDepth == 0 || m_eventData.empty())
     {
@@ -291,7 +293,7 @@ ArgumentStack Events::OnSkipEvent(ArgumentStack&&)
     return ArgumentStack();
 }
 
-ArgumentStack Events::OnSetEventResult(ArgumentStack&& args)
+ArgumentStack Events::SetEventResult(ArgumentStack&& args)
 {
     if (m_eventDepth == 0 || m_eventData.empty())
     {
@@ -306,7 +308,7 @@ ArgumentStack Events::OnSetEventResult(ArgumentStack&& args)
     return ArgumentStack();
 }
 
-ArgumentStack Events::OnGetCurrentEvent(ArgumentStack&&)
+ArgumentStack Events::GetCurrentEvent(ArgumentStack&&)
 {
     std::string retVal;
 
@@ -324,7 +326,7 @@ ArgumentStack Events::OnGetCurrentEvent(ArgumentStack&&)
     return stack;
 }
 
-ArgumentStack Events::OnToggleDispatchListMode(ArgumentStack&& args)
+ArgumentStack Events::ToggleDispatchListMode(ArgumentStack&& args)
 {
     ArgumentStack stack;
 
@@ -342,7 +344,7 @@ ArgumentStack Events::OnToggleDispatchListMode(ArgumentStack&& args)
     return stack;
 }
 
-ArgumentStack Events::OnAddObjectToDispatchList(ArgumentStack&& args)
+ArgumentStack Events::AddObjectToDispatchList(ArgumentStack&& args)
 {
     ArgumentStack stack;
 
@@ -362,7 +364,7 @@ ArgumentStack Events::OnAddObjectToDispatchList(ArgumentStack&& args)
     return stack;
 }
 
-ArgumentStack Events::OnRemoveObjectFromDispatchList(ArgumentStack&& args)
+ArgumentStack Events::RemoveObjectFromDispatchList(ArgumentStack&& args)
 {
     ArgumentStack stack;
 

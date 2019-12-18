@@ -47,6 +47,8 @@ private:
     ArgumentStack SetPersistentLocation             (ArgumentStack&& args);
     ArgumentStack UpdateItemName                    (ArgumentStack&& args);
     ArgumentStack PossessCreature                   (ArgumentStack&& args);
+    ArgumentStack GetPlatformId                     (ArgumentStack&& args);
+    ArgumentStack GetLanguage                       (ArgumentStack&& args);
 
     CNWSPlayer *player(ArgumentStack& args);
 

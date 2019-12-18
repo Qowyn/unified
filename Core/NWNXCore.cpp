@@ -178,11 +178,13 @@ void NWNXCore::InitialSetupHooks()
     m_services->m_hooks->RequestSharedHook<API::Functions::_ZN8CNWSAreaD0Ev, void>(&Services::PerObjectStorage::CNWSArea__CNWSAreaDtor__0_hook);
     m_services->m_hooks->RequestSharedHook<API::Functions::_ZN10CNWSPlayer7EatTURDEP14CNWSPlayerTURD, void>(&Services::PerObjectStorage::CNWSPlayer__EatTURD_hook);
     m_services->m_hooks->RequestSharedHook<API::Functions::_ZN10CNWSPlayer8DropTURDEv, void>(&Services::PerObjectStorage::CNWSPlayer__DropTURD_hook);
+    m_services->m_hooks->RequestSharedHook<API::Functions::_ZN8CNWSUUID9SaveToGffEP7CResGFFP10CResStruct, void>(&Services::PerObjectStorage::CNWSUUID__SaveToGff_hook);
+    m_services->m_hooks->RequestSharedHook<API::Functions::_ZN8CNWSUUID11LoadFromGffEP7CResGFFP10CResStruct, void>(&Services::PerObjectStorage::CNWSUUID__LoadFromGff_hook);
 
     m_services->m_hooks->RequestSharedHook<API::Functions::_ZN10CNWSModule20LoadModuleInProgressEii, uint32_t>(
-            +[](Services::Hooks::CallType type, CNWSModule *pModule, int32_t nAreasLoaded, int32_t nAreasToLoad)
+            +[](bool before, CNWSModule *pModule, int32_t nAreasLoaded, int32_t nAreasToLoad)
             {
-                if (type == Services::Hooks::CallType::BEFORE_ORIGINAL)
+                if (before)
                 {
                     int index = nAreasLoaded;
                     auto *node = pModule->m_lstModuleArea.m_pcExoLinkedListInternal->pHead;
@@ -203,17 +205,17 @@ void NWNXCore::InitialSetupHooks()
     if (!m_coreServices->m_config->Get<bool>("ALLOW_NWNX_FUNCTIONS_IN_EXECUTE_SCRIPT_CHUNK", false))
     {
         m_services->m_hooks->RequestSharedHook<API::Functions::_ZN25CNWVirtualMachineCommands32ExecuteCommandExecuteScriptChunkEii, int32_t>(
-                +[](Services::Hooks::CallType type, CNWVirtualMachineCommands*, int32_t, int32_t)
+                +[](bool before, CNWVirtualMachineCommands*, int32_t, int32_t)
                 {
-                    g_core->m_ScriptChunkRecursion += (type == Services::Hooks::CallType::BEFORE_ORIGINAL) ? +1 : -1;
+                    g_core->m_ScriptChunkRecursion += before ? +1 : -1;
                 });
     }
 
     // TODO-64Bit: Temp fix for POS
     m_services->m_hooks->RequestSharedHook<API::Functions::_ZN11CGameObjectC2Ehj, void>(
-            +[](Services::Hooks::CallType type, CGameObject* pThis, uint8_t, uint32_t)
+            +[](bool before, CGameObject* pThis, uint8_t, uint32_t)
             {
-                if (type == Services::Hooks::CallType::AFTER_ORIGINAL)
+                if (!before)
                     pThis->m_pNwnxData = nullptr;
             });
 }
@@ -221,14 +223,17 @@ void NWNXCore::InitialSetupHooks()
 void NWNXCore::InitialVersionCheck()
 {
     CExoString *pBuildNumber = Globals::BuildNumber();
+    CExoString *pBuildRevision = Globals::BuildRevision();
 
-    if (pBuildNumber)
+    if (pBuildNumber && pBuildRevision)
     {
         const uint32_t version = std::stoul(pBuildNumber->m_sString);
+        const uint32_t revision = std::stoul(pBuildRevision->m_sString);
 
-        if (version != NWNX_TARGET_NWN_BUILD)
+        if (version != NWNX_TARGET_NWN_BUILD || revision != NWNX_TARGET_NWN_BUILD_REVISION)
         {
-            std::fprintf(stderr, "NWNX: Expected build version %u, got build version %u", NWNX_TARGET_NWN_BUILD, version);
+            std::fprintf(stderr, "NWNX: Expected build version %u revision %u, got build version %u revision %u.",
+                                      NWNX_TARGET_NWN_BUILD, NWNX_TARGET_NWN_BUILD_REVISION, version, revision);
             std::fflush(stderr);
             std::abort();
         }
@@ -292,7 +297,7 @@ void NWNXCore::InitialSetupPlugins()
 
         std::unique_ptr<Services::ProxyServiceList> services = ConstructProxyServices(pluginNameWithoutExtension);
 
-        Plugin::CreateParams params = { services };
+        Plugin::CreateParams params = { services.get() };
 
         if (services->m_config->Get<bool>("SKIP", (bool)skipAllPlugins))
         {
@@ -573,14 +578,14 @@ void NWNXCore::DestroyServerHandler(CAppManager* app)
     RestoreCrashHandlers();
 }
 
-void NWNXCore::MainLoopInternalHandler(Services::Hooks::CallType type, CServerExoAppInternal*)
+void NWNXCore::MainLoopInternalHandler(bool before, CServerExoAppInternal*)
 {
-    if (type != Services::Hooks::CallType::BEFORE_ORIGINAL)
+    if (!before)
     {
         return;
     }
 
-    g_core->m_services->m_metrics->Update(g_core->m_services->m_tasks);
+    g_core->m_services->m_metrics->Update(g_core->m_services->m_tasks.get());
     g_core->m_services->m_tasks->ProcessWorkOnMainThread();
     g_core->m_services->m_commands->RunScheduledCommands();
 }

@@ -4,14 +4,13 @@
 #include "API/CNWSFaction.hpp"
 #include "API/Functions.hpp"
 #include "Services/PerObjectStorage/PerObjectStorage.hpp"
-#include "ViewPtr.hpp"
 
 
 
 using namespace NWNXLib;
 using namespace NWNXLib::API;
 
-static ViewPtr<Reveal::Reveal> g_plugin;
+static Reveal::Reveal* g_plugin;
 
 //key names for Per Object Storage
 const std::string revealKey = "REVEAL";
@@ -121,8 +120,8 @@ ArgumentStack Reveal::SetRevealToParty(ArgumentStack&& args)
 
     Services::PerObjectStorageProxy* pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
 
-    pPOS->Set(stealtherID, revealKey + "PARTY", revealToPartyState); //store party reveal state
-    pPOS->Set(stealtherID, detectionKey + "PARTY", detectionVector); //store the means through which detection happens
+    pPOS->Set(stealtherID, revealKey + "PARTY", revealToPartyState, true); //store party reveal state
+    pPOS->Set(stealtherID, detectionKey + "PARTY", detectionVector, true); //store the means through which detection happens
     return stack;
 }
 

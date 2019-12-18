@@ -9,13 +9,12 @@
 #include "API/CNWSPlayer.hpp"
 #include "Services/Events/Events.hpp"
 #include "Services/PerObjectStorage/PerObjectStorage.hpp"
-#include "ViewPtr.hpp"
 
 
 using namespace NWNXLib;
 using namespace NWNXLib::API;
 
-static ViewPtr<Feedback::Feedback> g_plugin;
+static Feedback::Feedback* g_plugin;
 
 NWNX_PLUGIN_ENTRY Plugin::Info* PluginInfo()
 {
@@ -194,7 +193,7 @@ ArgumentStack Feedback::SetMessageHidden(ArgumentStack&& args)
         }
         else
         {
-            g_plugin->GetServices()->m_perObjectStorage->Set(playerId, varName, !!state);
+            g_plugin->GetServices()->m_perObjectStorage->Set(playerId, varName, !!state, true);
         }
     }
 
