@@ -22,14 +22,13 @@
 #include "Services/Hooks/Hooks.hpp"
 #include "Services/Messaging/Messaging.hpp"
 #include "Services/PerObjectStorage/PerObjectStorage.hpp"
-#include "ViewPtr.hpp"
 #include "Utils.hpp"
 
 using namespace NWNXLib;
 using namespace NWNXLib::API;
 using namespace NWNXLib::API::Constants;
 
-static ViewPtr<Custom::Custom> g_plugin;
+static Custom::Custom* g_plugin;
 
 NWNX_PLUGIN_ENTRY Plugin::Info* PluginInfo()
 {
@@ -60,9 +59,12 @@ static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__SendServerToPlayerParty_Li
 static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__WriteGameObjUpdate_PartyAIStateHook;
 static NWNXLib::Hooking::FunctionHook* m_CWorldTimer__PauseWorldTimerHook;
 static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__SendServerToPlayerChatMultiLangMessageHook;
+static NWNXLib::Hooking::FunctionHook* m_CNWSMessage__SendServerToPlayerChatMultiLang_HelperHook;
 static std::unordered_map<Types::ObjectID, std::vector<Types::ObjectID>> timeStopAreas;
 static std::vector<Types::ObjectID> pauseAreas;
 static std::unordered_map<Types::ObjectID, CWorldTimer> areaTimers;
+
+constexpr uintptr_t ChatMultiLang_HelperInlined = 0x00000000002c7440;
 
 Custom::Custom(const Plugin::CreateParams& params)
     : Plugin(params)
@@ -78,6 +80,7 @@ Custom::Custom(const Plugin::CreateParams& params)
     REGISTER(GetFactionName);
     REGISTER(GetSuppressDialog);
     REGISTER(SetSuppressDialog);
+    REGISTER(SetHasInventory);
 #undef REGISTER
     GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv>(&InitializeNumberOfAttacks);
     m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv);
@@ -121,6 +124,8 @@ Custom::Custom(const Plugin::CreateParams& params)
 
     GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN11CNWSMessage38SendServerToPlayerChatMultiLangMessageEhj13CExoLocStringjhPjjiRK7CResRefij>(&SendServerToPlayerChatMultiLangMessage);
     m_CNWSMessage__SendServerToPlayerChatMultiLangMessageHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN11CNWSMessage38SendServerToPlayerChatMultiLangMessageEhj13CExoLocStringjhPjjiRK7CResRefij);
+    GetServices()->m_hooks->RequestExclusiveHook<ChatMultiLang_HelperInlined>(&SendServerToPlayerChatMultiLang_Helper);
+    m_CNWSMessage__SendServerToPlayerChatMultiLang_HelperHook = GetServices()->m_hooks->FindHookByAddress(ChatMultiLang_HelperInlined);
 }
 
 Custom::~Custom()
@@ -253,9 +258,15 @@ ArgumentStack Custom::GetSuppressDialog(ArgumentStack&& args)
 {
     ArgumentStack stack;
 
-    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
-    auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
-    int32_t retVal = pPOS->Get<int>(nObjectId, "SUPPRESS_DIALOG_LOG").value_or(0);
+    int32_t retVal = 0;
+    if (auto *pPlayer = player(args))
+    {
+        const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+        if (auto suppressData = g_plugin->GetServices()->m_perObjectStorage->Get<int>(pPlayer->m_oidPCObject, "SUPPRESS_DIALOG_LOG!" + Utils::ObjectIDToString(nObjectId)))
+        {
+            retVal = *suppressData;
+        }
+    }
     Services::Events::InsertArgument(stack, retVal);
 
     return stack;
@@ -264,14 +275,31 @@ ArgumentStack Custom::GetSuppressDialog(ArgumentStack&& args)
 ArgumentStack Custom::SetSuppressDialog(ArgumentStack&& args)
 {
     ArgumentStack stack;
-    
+
+    if (auto *pPlayer = player(args))
+    {
+        const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+        const auto bValue = Services::Events::ExtractArgument<int32_t>(args);
+
+        if (nObjectId != OBJECT_INVALID)
+        {
+            g_plugin->GetServices()->m_perObjectStorage->Set(pPlayer->m_oidPCObject, "SUPPRESS_DIALOG_LOG!" + Utils::ObjectIDToString(nObjectId), bValue);
+        }
+    }
+
+    return stack;
+}
+
+ArgumentStack Custom::SetHasInventory(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
     const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
     const auto bValue = Services::Events::ExtractArgument<int32_t>(args);
 
-    if (nObjectId != OBJECT_INVALID)
+    if (auto *pPLC = Globals::AppManager()->m_pServerExoApp->GetPlaceableByGameObjectID(nObjectId))
     {
-        auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
-        pPOS->Set(nObjectId, "SUPPRESS_DIALOG_LOG", bValue);
+        pPLC->m_bHasInventory = bValue;
     }
 
     return stack;
@@ -878,18 +906,35 @@ void Custom::ResetTimer(uint32_t nArea)
     }
 }
 
-int32_t Custom::SendServerToPlayerChatMultiLangMessage(CNWSMessage *pMessage, uint8_t nChatMessageType, OBJECT_ID oidSpeaker, CExoLocString sSpeakerMessage, OBJECT_ID oidTokenTarget, uint8_t gender, uint32_t * pPlayerIdNoBubble, uint32_t nPlayerIdNoBubble, int32_t bPrivateChat, const CResRef & sSound, int32_t bPlayHelloSound, OBJECT_ID oidLastSpeaker)
+int32_t Custom::SendServerToPlayerChatMultiLangMessage(CNWSMessage *pMessage, uint8_t nChatMessageType, OBJECT_ID oidSpeaker, CExoLocString sSpeakerMessage, OBJECT_ID oidTokenTarget, uint8_t gender, uint32_t * pPlayerIdNoBubble, uint32_t nPlayerIdNoBubble, int32_t bPrivateChat, const CResRef * sSound, int32_t bPlayHelloSound, OBJECT_ID oidLastSpeaker)
 {
-    auto *pPOS = g_plugin->GetServices()->m_perObjectStorage.get();
+    auto bSuppress = g_plugin->GetServices()->m_perObjectStorage->Get<int>(oidSpeaker, "SUPPRESS_DIALOG_LOG");
 
-    auto bSuppress = pPOS->Get<int>(oidSpeaker, "SUPPRESS_DIALOG_LOG");
-
-    if (bSuppress.value_or(0))
+    if (bSuppress && *bSuppress)
     {
         return 0;
     }
 
     return m_CNWSMessage__SendServerToPlayerChatMultiLangMessageHook->CallOriginal<int32_t>(pMessage, nChatMessageType, oidSpeaker, sSpeakerMessage, oidTokenTarget, gender, pPlayerIdNoBubble, nPlayerIdNoBubble, bPrivateChat, sSound, bPlayHelloSound, oidLastSpeaker);
+}
+
+int32_t Custom::SendServerToPlayerChatMultiLang_Helper(CNWSMessage *pMessage, uint32_t nPlayerID, OBJECT_ID oidSpeaker, CExoLocString sSpeakerMessage, OBJECT_ID oidTokenTarget, uint8_t gender, BOOL bNoBubble, const CResRef * sSound, BOOL bPlayHelloSound, OBJECT_ID oidLastSpeaker)
+{
+    CNWSClient* client = Globals::AppManager()->m_pServerExoApp->GetClientObjectByPlayerId(nPlayerID, 0);
+
+    if (!client)
+    {
+        return 0;
+    }
+
+    auto bSuppress = g_plugin->GetServices()->m_perObjectStorage->Get<int>(static_cast<CNWSPlayer*>(client)->m_oidPCObject, "SUPPRESS_DIALOG_LOG!" + Utils::ObjectIDToString(oidSpeaker));
+
+    if (bSuppress && *bSuppress)
+    {
+        return 0;
+    }
+
+    return m_CNWSMessage__SendServerToPlayerChatMultiLang_HelperHook->CallOriginal<int32_t>(pMessage, nPlayerID, oidSpeaker, sSpeakerMessage, oidTokenTarget, gender, bNoBubble, sSound, bPlayHelloSound, oidLastSpeaker);
 }
 
 }
