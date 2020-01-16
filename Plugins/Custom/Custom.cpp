@@ -11,8 +11,10 @@
 #include "API/CNWSCreature.hpp"
 #include "API/CNWSCreatureStats.hpp"
 #include "API/CNWSFaction.hpp"
+#include "API/CNWSItem.hpp"
 #include "API/CNWSModule.hpp"
 #include "API/CNWSPlayer.hpp"
+#include "API/CNWSStore.hpp"
 #include "API/CWorldTimer.hpp"
 #include "API/Functions.hpp"
 #include "API/Globals.hpp"
@@ -81,6 +83,13 @@ Custom::Custom(const Plugin::CreateParams& params)
     REGISTER(GetSuppressDialog);
     REGISTER(SetSuppressDialog);
     REGISTER(SetHasInventory);
+    REGISTER(GetStoreBlackMarket);
+    REGISTER(GetStoreBlackMarketMarkDown);
+    REGISTER(GetStoreMarkDown);
+    REGISTER(GetStoreMarkUp);
+    REGISTER(CalculateItemBuyPrice);
+    REGISTER(CalculateItemSellPrice);
+    REGISTER(CompareItem);
 #undef REGISTER
     GetServices()->m_hooks->RequestExclusiveHook<Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv>(&InitializeNumberOfAttacks);
     m_InitializeNumberOfAttacksHook = GetServices()->m_hooks->FindHookByAddress(Functions::_ZN15CNWSCombatRound25InitializeNumberOfAttacksEv);
@@ -301,6 +310,132 @@ ArgumentStack Custom::SetHasInventory(ArgumentStack&& args)
     {
         pPLC->m_bHasInventory = bValue;
     }
+
+    return stack;
+}
+
+ArgumentStack Custom::GetStoreBlackMarket(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = 0;
+    if (auto *pStore = Globals::AppManager()->m_pServerExoApp->GetStoreByGameObjectID(nObjectId))
+    {
+        retVal = pStore->m_bBlackMarket;
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::GetStoreBlackMarketMarkDown(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = -1;
+    if (auto *pStore = Globals::AppManager()->m_pServerExoApp->GetStoreByGameObjectID(nObjectId))
+    {
+        retVal = pStore->m_nBlackMarketMarkDown;
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::GetStoreMarkDown(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = -1;
+    if (auto *pStore = Globals::AppManager()->m_pServerExoApp->GetStoreByGameObjectID(nObjectId))
+    {
+        retVal = pStore->m_nMarkDown;
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::GetStoreMarkUp(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nObjectId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = -1;
+    if (auto *pStore = Globals::AppManager()->m_pServerExoApp->GetStoreByGameObjectID(nObjectId))
+    {
+        retVal = pStore->m_nMarkUp;
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::CalculateItemBuyPrice(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nStoreId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto nItemId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto nSellerId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = -1;
+    if (auto *pStore = Globals::AppManager()->m_pServerExoApp->GetStoreByGameObjectID(nStoreId))
+    {
+        if (auto *pItem = Globals::AppManager()->m_pServerExoApp->GetItemByGameObjectID(nItemId))
+        {
+            retVal = pStore->CalculateItemBuyPrice(pItem, nSellerId);
+        }
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::CalculateItemSellPrice(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nStoreId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto nItemId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto nBuyerId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = -1;
+    if (auto *pStore = Globals::AppManager()->m_pServerExoApp->GetStoreByGameObjectID(nStoreId))
+    {
+        if (auto *pItem = Globals::AppManager()->m_pServerExoApp->GetItemByGameObjectID(nItemId))
+        {
+            retVal = pStore->CalculateItemSellPrice(pItem, nBuyerId);
+        }
+    }
+    Services::Events::InsertArgument(stack, retVal);
+
+    return stack;
+}
+
+ArgumentStack Custom::CompareItem(ArgumentStack&& args)
+{
+    ArgumentStack stack;
+
+    const auto nSourceId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+    const auto nTargetId = Services::Events::ExtractArgument<Types::ObjectID>(args);
+
+    int32_t retVal = 0;
+    if (auto *pSource = Globals::AppManager()->m_pServerExoApp->GetItemByGameObjectID(nSourceId))
+    {
+        if (auto *pTarget = Globals::AppManager()->m_pServerExoApp->GetItemByGameObjectID(nTargetId))
+        {
+            retVal = pSource->CompareItem(pTarget);
+        }
+    }
+    Services::Events::InsertArgument(stack, retVal);
 
     return stack;
 }

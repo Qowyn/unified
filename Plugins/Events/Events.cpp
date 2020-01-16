@@ -13,6 +13,7 @@
 #include "Events/ItemEvents.hpp"
 #include "Events/MapEvents.hpp"
 #include "Events/StealthEvents.hpp"
+#include "Events/StoreEvents.hpp"
 #include "Events/SpellEvents.hpp"
 #include "Events/PartyEvents.hpp"
 #include "Events/HealerKitEvents.hpp"
@@ -109,6 +110,7 @@ Events::Events(const Plugin::CreateParams& params)
     m_itemEvents        = std::make_unique<ItemEvents>(hooker);
     m_featEvents        = std::make_unique<FeatEvents>(hooker);
     m_stealthEvents     = std::make_unique<StealthEvents>(hooker);
+    m_storeEvents       = std::make_unique<StoreEvents>(hooker);
     m_spellEvents       = std::make_unique<SpellEvents>(hooker);
     m_partyEvents       = std::make_unique<PartyEvents>(hooker);
     m_healerKitEvents   = std::make_unique<HealerKitEvents>(hooker);

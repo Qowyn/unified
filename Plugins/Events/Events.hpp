@@ -23,6 +23,7 @@ class FeatEvents;
 class ItemEvents;
 class MapEvents;
 class StealthEvents;
+class StoreEvents;
 class SpellEvents;
 class PartyEvents;
 class HealerKitEvents;
@@ -110,6 +111,7 @@ private:
     std::unique_ptr<ItemEvents> m_itemEvents;
     std::unique_ptr<MapEvents> m_mapEvents;
     std::unique_ptr<StealthEvents> m_stealthEvents;
+    std::unique_ptr<StoreEvents> m_storeEvents;
     std::unique_ptr<SpellEvents> m_spellEvents;
     std::unique_ptr<PartyEvents> m_partyEvents;
     std::unique_ptr<HealerKitEvents> m_healerKitEvents;

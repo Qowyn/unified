@@ -42,6 +42,13 @@ private:
     ArgumentStack GetSuppressDialog(ArgumentStack&& args);
     ArgumentStack SetSuppressDialog(ArgumentStack&& args);
     ArgumentStack SetHasInventory(ArgumentStack&& args);
+    ArgumentStack GetStoreBlackMarket(ArgumentStack&& args);
+    ArgumentStack GetStoreBlackMarketMarkDown(ArgumentStack&& args);
+    ArgumentStack GetStoreMarkDown(ArgumentStack&& args);
+    ArgumentStack GetStoreMarkUp(ArgumentStack&& args);
+    ArgumentStack CalculateItemBuyPrice(ArgumentStack&& args);
+    ArgumentStack CalculateItemSellPrice(ArgumentStack&& args);
+    ArgumentStack CompareItem(ArgumentStack&& args);
     CNWSPlayer *player(ArgumentStack& args);
     static void InitializeNumberOfAttacks(CNWSCombatRound*);
     static int32_t GetFavoredEnemyBonus(CNWSCreatureStats*, CNWSCreature*);

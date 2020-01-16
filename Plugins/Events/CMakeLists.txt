@@ -10,6 +10,7 @@ add_plugin(Events
     "Events/ItemEvents.cpp"
     "Events/MapEvents.cpp"
     "Events/StealthEvents.cpp"
+    "Events/StoreEvents.cpp"
     "Events/SpellEvents.cpp"
     "Events/PartyEvents.cpp"
     "Events/HealerKitEvents.cpp"
